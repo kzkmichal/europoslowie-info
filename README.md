@@ -22,8 +22,10 @@ python -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
 pip install -r requirements.txt
 
-# Install Node dependencies (after Next.js is set up)
-# npm install
+# Install Node dependencies
+cd frontend
+npm install
+cd ..
 ```
 
 ### 2. Set up Database
@@ -99,6 +101,17 @@ SELECT * FROM meps LIMIT 1;          -- Should show MEP data
 
 # Exit psql
 \q
+
+# Test Drizzle ORM and query functions
+cd frontend
+npm run db:test          # Test database connection
+npm run db:test:queries  # Test all query functions
+```
+
+Expected output:
+```
+✅ Database connection successful
+✅ All query tests completed successfully!
 ```
 
 ## Database Schema
@@ -113,7 +126,7 @@ The database consists of 7 main tables:
 6. **speeches** - Parliamentary speeches
 7. **committee_memberships** - Committee assignments
 
-See `DATABASE_SCHEMA.md` for detailed documentation.
+See `docs/DATABASE_SCHEMA.md` for detailed documentation.
 
 ## Development Workflow
 
@@ -158,6 +171,18 @@ python scripts/seed_database.py --minimal
 
 ```
 europrojekt/
+├── frontend/              # Next.js 16 application
+│   ├── app/               # Next.js App Router pages (to be built)
+│   ├── lib/
+│   │   └── db/            # Drizzle ORM setup
+│   │       ├── index.ts   # Database connection
+│   │       ├── schema.ts  # Drizzle schema
+│   │       └── queries.ts # Query functions
+│   ├── scripts/           # Frontend test scripts
+│   │   ├── test-db-connection.ts
+│   │   └── test-queries.ts
+│   ├── package.json       # Node.js dependencies
+│   └── .env.local         # Frontend environment variables
 ├── scripts/
 │   ├── alembic/           # Database migrations
 │   │   └── versions/      # Migration files
@@ -175,20 +200,28 @@ europrojekt/
 
 ## Next Steps
 
-- [ ] Set up Next.js frontend (see `SETUP_GUIDE.md`)
-- [ ] Implement Python scrapers (see `SCRAPING_STRATEGY.md`)
-- [ ] Configure AI processing (see `AI_PROMPTS.md`)
+- [x] Set up Next.js 16 frontend infrastructure
+- [x] Install and configure Drizzle ORM
+- [x] Create database schema and query functions
+- [ ] Build Next.js frontend pages (data layer ready)
+- [ ] Implement Python scrapers (see `docs/SCRAPING_STRATEGY.md`)
+- [ ] Configure AI processing (see `docs/AI_PROMPTS.md`)
 - [ ] Deploy to Vercel + Supabase
 
 ## Documentation
 
-- **[PROJECT_OVERVIEW.md](PROJECT_OVERVIEW.md)** - Project goals and scope
-- **[TECH_STACK.md](TECH_STACK.md)** - Technology choices
-- **[DATABASE_SCHEMA.md](DATABASE_SCHEMA.md)** - Database structure
-- **[ARCHITECTURE.md](ARCHITECTURE.md)** - System architecture
-- **[SCRAPING_STRATEGY.md](SCRAPING_STRATEGY.md)** - Data collection
-- **[AI_PROMPTS.md](AI_PROMPTS.md)** - AI integration
-- **[SETUP_GUIDE.md](SETUP_GUIDE.md)** - Detailed setup instructions
+All detailed documentation is in the `docs/` folder (local only, not committed to git):
+
+- **[PROJECT_OVERVIEW.md](docs/PROJECT_OVERVIEW.md)** - Project goals and scope
+- **[TECH_STACK.md](docs/TECH_STACK.md)** - Technology choices and versions
+- **[SETUP_GUIDE.md](docs/SETUP_GUIDE.md)** - Detailed setup instructions
+- **[DATABASE_SCHEMA.md](docs/DATABASE_SCHEMA.md)** - Database structure
+- **[DATA_FETCHING.md](docs/DATA_FETCHING.md)** - Drizzle ORM queries and examples
+- **[DATA_CONTRACTS.md](docs/DATA_CONTRACTS.md)** - TypeScript types and contracts
+- **[ARCHITECTURE.md](docs/ARCHITECTURE.md)** - System architecture
+- **[FRONTEND_MVP_STRUCTURE.md](docs/FRONTEND_MVP_STRUCTURE.md)** - Frontend pages structure
+- **[SCRAPING_STRATEGY.md](docs/SCRAPING_STRATEGY.md)** - Data collection strategy
+- **[AI_PROMPTS.md](docs/AI_PROMPTS.md)** - AI integration and prompts
 
 ## Troubleshooting
 

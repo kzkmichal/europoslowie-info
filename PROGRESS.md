@@ -1,6 +1,6 @@
 # Project Progress
 
-Last updated: 2024-12-13
+Last updated: 2025-12-30
 
 ## ✅ Completed
 
@@ -20,11 +20,38 @@ Last updated: 2024-12-13
 - [x] MEPs scraper (primary + fallback strategy)
 - [x] Test script for MEPs scraper
 
+### Phase 4: Frontend Infrastructure (Next.js)
+- [x] Next.js 16.1.0 setup with App Router
+- [x] React 19.2.3 installation
+- [x] TypeScript 5 configuration
+- [x] Tailwind CSS 4 setup
+- [x] Drizzle ORM 0.45.1 installation and configuration
+- [x] PostgreSQL driver (postgres 3.4.7) setup
+- [x] Database connection layer (`frontend/lib/db/index.ts`)
+- [x] Drizzle schema matching PostgreSQL tables (`frontend/lib/db/schema.ts`)
+- [x] Relations and type exports for all tables
+- [x] Query functions for all frontend pages (`frontend/lib/db/queries.ts`)
+  - [x] `getAllMEPsWithStats()` - Homepage
+  - [x] `getMepBySlug()` - MEP profile pages
+  - [x] `getVoteById()` - Vote details pages
+  - [x] `getCurrentMonthTopVotes()` - Top votes page
+- [x] Database connection testing script
+- [x] Query functions testing script
+- [x] All tests passing successfully
+
 ## 🚧 In Progress
 
+### Phase 2: Scrapers (Continued)
 - [ ] Votes scraper implementation
 - [ ] Sessions scraper implementation
 - [ ] Web scraping fallback (BeautifulSoup)
+
+### Phase 4: Frontend Pages
+- [ ] Homepage (MEPs list) - data layer ready
+- [ ] MEP profile pages - data layer ready
+- [ ] Vote details pages - data layer ready
+- [ ] Top votes page - data layer ready
+- [ ] UI components (Radix UI + Tailwind)
 
 ## 📋 Pending
 
@@ -34,14 +61,6 @@ Last updated: 2024-12-13
 - [ ] Poland relevance scorer (Haiku 4.5)
 - [ ] Arguments extractor (Haiku 4.5)
 - [ ] Batch processing pipeline
-
-### Phase 4: Frontend (Next.js)
-- [ ] Next.js 14 setup with App Router
-- [ ] Homepage (MEPs list)
-- [ ] MEP profile pages
-- [ ] Vote details pages
-- [ ] Top votes page
-- [ ] UI components (Radix UI + Tailwind)
 
 ### Phase 5: Automation
 - [ ] GitHub Actions workflow
@@ -61,15 +80,17 @@ Last updated: 2024-12-13
 - **Database Tables:** 7/7 ✓
 - **Scrapers:** 1/4 (25%)
 - **Test Data:** 5 MEPs, 20 votes ✓
-- **Documentation:** 100% complete
-- **Git commits:** 1
+- **Frontend Infrastructure:** 100% complete ✓
+- **Query Functions:** 4/4 (100%) ✓
+- **Documentation:** Updated
+- **Git commits:** 3
 
 ## 🎯 Next Steps
 
-1. **Test MEPs scraper** - Verify it works with real EP API
+1. **Build Next.js frontend pages** - Use completed query functions to create UI
 2. **Implement votes scraper** - Largest and most complex scraper
 3. **Add AI processing** - Integrate Claude API
-4. **Build Next.js frontend** - Create user interface
+4. **Deploy MVP** - Vercel + Supabase
 
 ## 📝 Notes
 

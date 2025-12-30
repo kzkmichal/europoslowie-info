@@ -56,3 +56,6 @@ next-env.d.ts
 *.db
 *.sqlite
 *.sqlite3
+
+# Documentation (keep local only)
+docs/
