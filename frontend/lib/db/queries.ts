@@ -7,8 +7,10 @@ import {
   votingSessions,
 } from './schema'
 import { eq, desc, and, sql } from 'drizzle-orm'
+import type { MEPWithStats, MEPProfile, VoteDetails } from '../types'
+import type { Vote } from './schema'
 
-export async function getAllMEPsWithStats() {
+export async function getAllMEPsWithStats(): Promise<MEPWithStats[]> {
   const allMeps = await db.select().from(meps).where(eq(meps.isActive, true))
 
   const mepsWithStats = await Promise.all(
@@ -42,7 +44,7 @@ export async function getAllMEPsWithStats() {
   return mepsWithStats
 }
 
-export async function getMepBySlug(slug: string) {
+export async function getMepBySlug(slug: string): Promise<MEPProfile | null> {
   const mep = await db.select().from(meps).where(eq(meps.slug, slug)).limit(1)
 
   if (!mep[0]) return null
@@ -79,7 +81,7 @@ export async function getMepBySlug(slug: string) {
   }
 }
 
-export async function getVoteById(id: number) {
+export async function getVoteById(id: number): Promise<VoteDetails | null> {
   const voteData = await db
     .select({
       vote: votes,
@@ -138,7 +140,10 @@ export async function getVoteById(id: number) {
   }
 }
 
-export async function getTopVotesForMonth(year: number, month: number) {
+export async function getTopVotesForMonth(
+  year: number,
+  month: number
+): Promise<Vote[]> {
   const startDate = `${year}-${String(month).padStart(2, '0')}-01`
   const endDate = new Date(year, month, 0).toISOString().split('T')[0]
 
@@ -157,7 +162,7 @@ export async function getTopVotesForMonth(year: number, month: number) {
   return topVotes
 }
 
-export async function getCurrentMonthTopVotes() {
+export async function getCurrentMonthTopVotes(): Promise<Vote[]> {
   const now = new Date()
   const year = now.getFullYear()
   const month = now.getMonth() + 1
