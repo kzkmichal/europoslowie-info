@@ -71,15 +71,14 @@ class MEPsScraper(BaseScraper):
         """
         self.log_info("Attempting to scrape from EP Open Data API...")
 
-        # Note: This is a simplified example. The actual EP API structure
-        # may be different. You'll need to verify the actual endpoint.
-
-        # Example endpoint (may need adjustment based on actual API)
+        # Official EP API endpoint (verified)
+        # Documentation: https://data.europarl.europa.eu/pl/developer-corner/opendata-api
+        # Working endpoint: https://data.europarl.europa.eu/api/v2/meps?country-of-representation=PL&format=application%2Fld%2Bjson&parliamentary-term=10
         url = f"{self.base_url}/meps"
         params = {
-            'country-code': 'POL',  # Poland
-            'term': term,
-            'format': 'application/json'
+            'country-of-representation': 'PL',  # Poland
+            'parliamentary-term': str(term),
+            'format': 'application/ld+json'  # JSON-LD format
         }
 
         try:
@@ -87,7 +86,24 @@ class MEPsScraper(BaseScraper):
             data = response.json()
 
             meps = []
-            items = data.get('data', []) if isinstance(data, dict) else data
+
+            # Handle JSON-LD format response
+            # The API returns data in different structures
+            if isinstance(data, dict):
+                # Try different possible data containers
+                items = (
+                    data.get('data', []) or
+                    data.get('@graph', []) or
+                    data.get('ldPage', {}).get('result', []) or
+                    []
+                )
+            elif isinstance(data, list):
+                items = data
+            else:
+                self.log_error(f"Unexpected API response format: {type(data)}")
+                return []
+
+            self.log_info(f"Found {len(items)} MEPs in API response")
 
             for item in items:
                 mep = self._parse_api_mep(item)
@@ -107,29 +123,56 @@ class MEPsScraper(BaseScraper):
         Parse MEP data from API response.
 
         Args:
-            item: Raw API data item
+            item: Raw API data item from EP API v2
 
         Returns:
             Parsed MEP dictionary or None if invalid
+
+        Note:
+            EP API v2 returns basic info in list endpoint.
+            For full details (party, group, email), need to call individual MEP endpoint.
+            For MVP, we store basic info and can enhance later.
         """
         try:
-            # Extract data (field names may vary based on actual API)
+            # Extract EP ID (from 'identifier' field)
+            ep_id = self._extract_int(item, ['identifier', 'id', 'notation_codictPersonId'])
+
+            if not ep_id:
+                # Try parsing from 'id' field like "person/124877"
+                id_str = item.get('id', '')
+                if '/' in id_str:
+                    try:
+                        ep_id = int(id_str.split('/')[-1])
+                    except ValueError:
+                        pass
+
+            # Extract names
+            full_name = self._extract_str(item, ['label', 'fullName', 'name'])
+            first_name = self._extract_str(item, ['givenName', 'firstName'])
+            last_name = self._extract_str(item, ['familyName', 'lastName', 'surname'])
+
+            # Extract email (if present in basic response)
+            email = self._extract_str(item, ['hasEmail', 'email', 'contactEmail'])
+            if email and email.startswith('mailto:'):
+                email = email.replace('mailto:', '')
+
+            # Build MEP dict with available data
             mep = {
-                'ep_id': self._extract_int(item, ['id', 'mepId', 'identifier']),
-                'full_name': self._extract_str(item, ['label', 'fullName', 'name']),
-                'first_name': self._extract_str(item, ['givenName', 'firstName']),
-                'last_name': self._extract_str(item, ['familyName', 'lastName', 'surname']),
-                'national_party': self._extract_nested(item, ['nationalParty', 'label']),
-                'ep_group': self._extract_nested(item, ['politicalGroup', 'label']),
-                'email': self._extract_str(item, ['email', 'contactEmail']),
-                'photo_url': self._extract_str(item, ['img', 'photoUrl', 'image']),
-                'website_url': self._extract_str(item, ['homepage', 'websiteUrl']),
-                'term_start': self._extract_date(item, ['mandateStartDate', 'termStart']),
-                'term_end': self._extract_date(item, ['mandateEndDate', 'termEnd']),
-                'is_active': item.get('isActive', True)
+                'ep_id': ep_id,
+                'full_name': full_name,
+                'first_name': first_name,
+                'last_name': last_name,
+                'national_party': None,  # Not in basic API response
+                'ep_group': None,  # Not in basic API response
+                'email': email,
+                'photo_url': None,  # Not in basic API response
+                'website_url': None,  # Not in basic API response
+                'term_start': None,  # Not in basic API response
+                'term_end': None,  # Not in basic API response
+                'is_active': True  # Assume active if returned by API
             }
 
-            # Generate slug if not provided
+            # Generate slug
             if not mep.get('slug'):
                 mep['slug'] = self._generate_slug(mep['full_name'])
 
