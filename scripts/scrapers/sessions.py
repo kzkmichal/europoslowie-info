@@ -72,8 +72,10 @@ class VotingSessionsScraper(BaseScraper):
         """
         Scrape sessions from EP Open Data API.
 
-        Uses /meetings endpoint which returns individual plenary sitting days.
-        We group consecutive days into sessions (e.g., Mon-Thu = one session).
+        Strategy:
+        - For recent data (>=2020): Generate meeting IDs by date and fetch individually
+        - For historical data (<2020): Use bulk /meetings endpoint
+        - Group consecutive days into sessions (e.g., Mon-Thu = one session)
 
         Args:
             year: Year
@@ -84,20 +86,119 @@ class VotingSessionsScraper(BaseScraper):
         """
         self.log_info("Attempting to scrape from EP Open Data API...")
 
-        # Working endpoint: /meetings (verified Jan 2026)
-        # Returns individual plenary sitting days that we'll group into sessions
+        # Choose strategy based on year
+        if year >= 2020:
+            # Recent data: fetch by generated IDs (works for 2020-present)
+            meeting_days = self._scrape_recent_meetings(year, month)
+        else:
+            # Historical data: use bulk endpoint (works for 2014-2019)
+            meeting_days = self._scrape_historical_meetings(year, month)
+
+        if not meeting_days:
+            self.log_warning(f"No plenary meetings found for {year}-{month:02d}")
+            return []
+
+        # Group consecutive meeting days into sessions
+        sessions = self._group_days_into_sessions(meeting_days, year, month)
+
+        self.stats['items_scraped'] += len(sessions)
+        return sessions
+
+    def _scrape_recent_meetings(
+        self,
+        year: int,
+        month: int
+    ) -> List[Dict[str, Any]]:
+        """
+        Scrape recent meetings (2020+) by generating IDs and fetching individually.
+
+        Meeting IDs follow pattern: MTG-PL-YYYY-MM-DD
+        We generate all possible IDs for the month and check which exist.
+
+        Args:
+            year: Year
+            month: Month
+
+        Returns:
+            List of parsed meeting day dicts
+        """
+        from datetime import datetime, timedelta
+        import calendar
+
+        self.log_info(f"Fetching recent meetings for {year}-{month:02d} (individual ID method)...")
+
+        # Get last day of month
+        last_day = calendar.monthrange(year, month)[1]
+        start_date = datetime(year, month, 1)
+        end_date = datetime(year, month, last_day)
+
+        meeting_days = []
+        current_date = start_date
+
+        # Try each day in the month
+        # Use requests directly to avoid retry logic on expected 404s
+        import requests
+
+        while current_date <= end_date:
+            meeting_id = f"MTG-PL-{current_date.strftime('%Y-%m-%d')}"
+            url = f"{self.base_url}/meetings/{meeting_id}"
+            params = {'format': 'application/ld+json'}
+
+            try:
+                # Direct request without retry logic
+                response = requests.get(url, params=params, timeout=10)
+
+                if response.status_code == 200:
+                    data = response.json()
+                    items = data.get('data', [])
+
+                    if items:
+                        item = items[0]  # Should only be one meeting per day
+                        # Check if it's current term (ep-10)
+                        term = item.get('parliamentary_term', '')
+                        if 'ep-10' in term:
+                            parsed = self._parse_api_meeting_day(item, year, month)
+                            if parsed:
+                                meeting_days.append(parsed)
+                                self.log_info(f"  ✓ Found meeting: {meeting_id}")
+
+            except Exception as e:
+                # 404 or other errors are expected for non-meeting days - silently skip
+                pass
+
+            current_date += timedelta(days=1)
+
+        self.log_info(f"Found {len(meeting_days)} meeting days for {year}-{month:02d}")
+        return meeting_days
+
+    def _scrape_historical_meetings(
+        self,
+        year: int,
+        month: int
+    ) -> List[Dict[str, Any]]:
+        """
+        Scrape historical meetings (<2020) using bulk /meetings endpoint.
+
+        Args:
+            year: Year
+            month: Month
+
+        Returns:
+            List of parsed meeting day dicts
+        """
+        self.log_info(f"Fetching historical meetings for {year}-{month:02d} (bulk method)...")
+
         url = f"{self.base_url}/meetings"
         params = {
             'format': 'application/ld+json',
             'had-activity-type': 'def/ep-activities/PLENARY_SITTING',
-            'limit': 1000  # Get enough data to cover the month
+            'limit': 1000
         }
 
         try:
             response = self.http.get(url, params=params)
             data = response.json()
 
-            # Extract meeting days
             items = data.get('data', []) if isinstance(data, dict) else []
 
             # Filter to requested year/month and parse
@@ -107,15 +208,7 @@ class VotingSessionsScraper(BaseScraper):
                 if parsed:
                     meeting_days.append(parsed)
 
-            if not meeting_days:
-                self.log_warning(f"No plenary meetings found for {year}-{month:02d}")
-                return []
-
-            # Group consecutive meeting days into sessions
-            sessions = self._group_days_into_sessions(meeting_days, year, month)
-
-            self.stats['items_scraped'] += len(sessions)
-            return sessions
+            return meeting_days
 
         except Exception as e:
             self.log_error(f"API parsing error: {e}")
@@ -139,13 +232,32 @@ class VotingSessionsScraper(BaseScraper):
             Parsed meeting day dict or None if not in target month
         """
         try:
-            # Extract date from ISO format: "2024-11-13T00:00:00+01:00"
-            date_str = item.get('eli-dl:activity_date', {}).get('@value', '')
+            # Extract date - handle both old and new API formats
+            # Old format: {'eli-dl:activity_date': {'@value': '2019-01-14T00:00:00+01:00'}}
+            # New format: {'activity_date': '2024-12-16'}
+            date_str = None
+
+            # Try old format first
+            if 'eli-dl:activity_date' in item:
+                date_value = item['eli-dl:activity_date']
+                if isinstance(date_value, dict):
+                    date_str = date_value.get('@value', '')
+                else:
+                    date_str = str(date_value)
+
+            # Try new format
+            if not date_str and 'activity_date' in item:
+                date_str = item['activity_date']
+
             if not date_str:
                 return None
 
-            # Parse date
-            date_obj = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+            # Parse date (handle both full timestamps and date-only strings)
+            if 'T' in date_str:
+                date_obj = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+            else:
+                # Date-only string like "2024-12-16"
+                date_obj = datetime.strptime(date_str, '%Y-%m-%d')
 
             # Filter to target year/month
             if date_obj.year != target_year or date_obj.month != target_month:
