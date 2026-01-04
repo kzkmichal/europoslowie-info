@@ -72,6 +72,9 @@ class VotingSessionsScraper(BaseScraper):
         """
         Scrape sessions from EP Open Data API.
 
+        Uses /meetings endpoint which returns individual plenary sitting days.
+        We group consecutive days into sessions (e.g., Mon-Thu = one session).
+
         Args:
             year: Year
             month: Month
@@ -81,39 +84,207 @@ class VotingSessionsScraper(BaseScraper):
         """
         self.log_info("Attempting to scrape from EP Open Data API...")
 
-        # Calculate date range for the month
-        start_date = datetime(year, month, 1)
-        if month == 12:
-            end_date = datetime(year + 1, 1, 1) - timedelta(days=1)
-        else:
-            end_date = datetime(year, month + 1, 1) - timedelta(days=1)
-
-        # Example endpoint (may need adjustment based on actual API)
-        url = f"{self.base_url}/plenary-sessions"
+        # Working endpoint: /meetings (verified Jan 2026)
+        # Returns individual plenary sitting days that we'll group into sessions
+        url = f"{self.base_url}/meetings"
         params = {
-            'date-from': start_date.strftime('%Y-%m-%d'),
-            'date-to': end_date.strftime('%Y-%m-%d'),
-            'format': 'application/json'
+            'format': 'application/ld+json',
+            'had-activity-type': 'def/ep-activities/PLENARY_SITTING',
+            'limit': 1000  # Get enough data to cover the month
         }
 
         try:
             response = self.http.get(url, params=params)
             data = response.json()
 
-            sessions = []
-            items = data.get('data', []) if isinstance(data, dict) else data
+            # Extract meeting days
+            items = data.get('data', []) if isinstance(data, dict) else []
 
+            # Filter to requested year/month and parse
+            meeting_days = []
             for item in items:
-                session = self._parse_api_session(item)
-                if session:
-                    sessions.append(session)
-                    self.stats['items_scraped'] += 1
+                parsed = self._parse_api_meeting_day(item, year, month)
+                if parsed:
+                    meeting_days.append(parsed)
 
+            if not meeting_days:
+                self.log_warning(f"No plenary meetings found for {year}-{month:02d}")
+                return []
+
+            # Group consecutive meeting days into sessions
+            sessions = self._group_days_into_sessions(meeting_days, year, month)
+
+            self.stats['items_scraped'] += len(sessions)
             return sessions
 
         except Exception as e:
             self.log_error(f"API parsing error: {e}")
             return []
+
+    def _parse_api_meeting_day(
+        self,
+        item: Dict,
+        target_year: int,
+        target_month: int
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Parse individual meeting day from /meetings API response.
+
+        Args:
+            item: Raw API meeting day item
+            target_year: Filter to this year
+            target_month: Filter to this month
+
+        Returns:
+            Parsed meeting day dict or None if not in target month
+        """
+        try:
+            # Extract date from ISO format: "2024-11-13T00:00:00+01:00"
+            date_str = item.get('eli-dl:activity_date', {}).get('@value', '')
+            if not date_str:
+                return None
+
+            # Parse date
+            date_obj = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+
+            # Filter to target year/month
+            if date_obj.year != target_year or date_obj.month != target_month:
+                return None
+
+            # Extract location from hasLocality URL
+            # e.g., "http://publications.europa.eu/resource/authority/place/FRA_SXB" -> "Strasbourg"
+            location_url = item.get('hasLocality', '')
+            location = 'Unknown'
+            if 'FRA_SXB' in location_url:
+                location = 'Strasbourg'
+            elif 'BEL_BRU' in location_url:
+                location = 'Brussels'
+
+            # Extract vote items if present
+            vote_items = item.get('consists_of', [])
+
+            return {
+                'activity_id': item.get('activity_id', ''),
+                'date': date_obj.date(),
+                'location': location,
+                'parliamentary_term': item.get('parliamentary_term', ''),
+                'vote_items': vote_items,
+                'vote_count': len(vote_items)
+            }
+
+        except Exception as e:
+            self.log_warning(f"Failed to parse meeting day: {e}")
+            return None
+
+    def _group_days_into_sessions(
+        self,
+        meeting_days: List[Dict],
+        year: int,
+        month: int
+    ) -> List[Dict[str, Any]]:
+        """
+        Group consecutive meeting days into sessions.
+
+        European Parliament plenary sessions typically last 3-4 consecutive days
+        (Monday-Thursday or similar). We group days that are within 1-2 days of
+        each other into the same session.
+
+        Args:
+            meeting_days: List of parsed meeting day dicts
+            year: Year
+            month: Month
+
+        Returns:
+            List of session dictionaries
+        """
+        if not meeting_days:
+            return []
+
+        # Sort by date
+        meeting_days.sort(key=lambda x: x['date'])
+
+        sessions = []
+        current_session_days = [meeting_days[0]]
+
+        for i in range(1, len(meeting_days)):
+            prev_date = current_session_days[-1]['date']
+            curr_date = meeting_days[i]['date']
+
+            # If days are within 2 days of each other, same session
+            days_diff = (curr_date - prev_date).days
+
+            if days_diff <= 2:
+                # Same session
+                current_session_days.append(meeting_days[i])
+            else:
+                # New session - save current one
+                sessions.append(self._create_session_from_days(
+                    current_session_days,
+                    len(sessions) + 1,
+                    year,
+                    month
+                ))
+                # Start new session
+                current_session_days = [meeting_days[i]]
+
+        # Don't forget the last session
+        if current_session_days:
+            sessions.append(self._create_session_from_days(
+                current_session_days,
+                len(sessions) + 1,
+                year,
+                month
+            ))
+
+        return sessions
+
+    def _create_session_from_days(
+        self,
+        days: List[Dict],
+        session_num: int,
+        year: int,
+        month: int
+    ) -> Dict[str, Any]:
+        """
+        Create a session dictionary from grouped meeting days.
+
+        Args:
+            days: List of meeting day dicts
+            session_num: Session number (I, II, III, etc.)
+            year: Year
+            month: Month
+
+        Returns:
+            Session dictionary
+        """
+        # Roman numerals for session number
+        roman = ['I', 'II', 'III', 'IV', 'V', 'VI']
+        roman_num = roman[session_num - 1] if session_num <= len(roman) else str(session_num)
+
+        # Session number format: "2024-11-I" (year-month-session)
+        session_number = f"{year}-{month:02d}-{roman_num}"
+
+        # Start and end dates
+        start_date = days[0]['date']
+        end_date = days[-1]['date']
+
+        # Location (take most common or first)
+        location = days[0]['location']
+
+        # Total votes (sum of all vote items across all days)
+        total_votes = sum(day['vote_count'] for day in days)
+
+        return {
+            'session_number': session_number,
+            'start_date': start_date.isoformat(),
+            'end_date': end_date.isoformat(),
+            'session_type': 'PLENARY',
+            'location': location,
+            'year': year,
+            'month': month,
+            'total_votes': total_votes,
+            'days_count': len(days)
+        }
 
     def _parse_api_session(self, item: Dict) -> Optional[Dict[str, Any]]:
         """
