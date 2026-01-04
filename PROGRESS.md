@@ -114,10 +114,12 @@ Last updated: 2026-01-04
 1. ~~**Fix HTTP client encoding issue**~~ ✅ - Completed (ASCII-safe User-Agent)
 2. ~~**Test scrapers with real EP data**~~ ✅ - Completed (54 Polish MEPs successfully scraped)
 3. ~~**Populate MEPs data**~~ ✅ - Completed (54 MEPs from real EP API in database)
-4. **Research and fix EP API endpoints for Sessions and Votes** - Find correct endpoints or use web scraping fallback
-5. **Populate voting data** - Run sessions and votes scrapers once endpoints are verified
-6. **Implement AI processing** - Integrate Claude API for vote context and importance scoring
-7. **Deploy MVP** - Vercel + Supabase
+4. ~~**Research and fix EP API endpoints for Sessions**~~ ✅ - Found /meetings endpoint (2014-2019 data)
+5. **Decide on current sessions data strategy** - Choose between web scraping, manual data, or hybrid approach
+6. **Research and fix EP API endpoints for Votes** - Find votes XML URLs or alternative endpoint
+7. **Populate voting data** - Run sessions and votes scrapers once all endpoints verified
+8. **Implement AI processing** - Integrate Claude API for vote context and importance scoring
+9. **Deploy MVP** - Vercel + Supabase
 
 ## 📝 Notes
 
@@ -125,4 +127,6 @@ Last updated: 2026-01-04
 - Mock data used when EP API is unavailable
 - All environment variables in `.env.local` (not committed)
 - Logs stored in `logs/` directory
-- **Test Report:** Scraper infrastructure verified working; EP API endpoints need research/updating (see SCRAPER_TEST_REPORT.md)
+- **Scraper Reports:**
+  - SCRAPER_SUCCESS_REPORT.md - MEPs scraper working with real data
+  - SESSIONS_SCRAPER_FINDINGS.md - Sessions scraper working but limited to 2014-2019 data
