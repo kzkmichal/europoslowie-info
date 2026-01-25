@@ -71,15 +71,14 @@ class MEPsScraper(BaseScraper):
         """
         self.log_info("Attempting to scrape from EP Open Data API...")
 
-        # Note: This is a simplified example. The actual EP API structure
-        # may be different. You'll need to verify the actual endpoint.
-
-        # Example endpoint (may need adjustment based on actual API)
+        # Official EP API endpoint (verified)
+        # Documentation: https://data.europarl.europa.eu/pl/developer-corner/opendata-api
+        # Working endpoint: https://data.europarl.europa.eu/api/v2/meps?country-of-representation=PL&format=application%2Fld%2Bjson&parliamentary-term=10
         url = f"{self.base_url}/meps"
         params = {
-            'country-code': 'POL',  # Poland
-            'term': term,
-            'format': 'application/json'
+            'country-of-representation': 'PL',  # Poland
+            'parliamentary-term': str(term),
+            'format': 'application/ld+json'  # JSON-LD format
         }
 
         try:
@@ -87,15 +86,41 @@ class MEPsScraper(BaseScraper):
             data = response.json()
 
             meps = []
-            items = data.get('data', []) if isinstance(data, dict) else data
 
+            # Handle JSON-LD format response
+            # The API returns data in different structures
+            if isinstance(data, dict):
+                # Try different possible data containers
+                items = (
+                    data.get('data', []) or
+                    data.get('@graph', []) or
+                    data.get('ldPage', {}).get('result', []) or
+                    []
+                )
+            elif isinstance(data, list):
+                items = data
+            else:
+                self.log_error(f"Unexpected API response format: {type(data)}")
+                return []
+
+            self.log_info(f"Found {len(items)} MEPs in API response")
+
+            # First pass: get basic info from list
             for item in items:
                 mep = self._parse_api_mep(item)
                 if mep:
                     meps.append(mep)
+
+            # Second pass: enrich with detailed info from individual endpoints
+            self.log_info(f"Fetching detailed info for {len(meps)} MEPs...")
+            enriched_meps = []
+            for mep in meps:
+                detailed_mep = self._fetch_mep_details(mep)
+                if detailed_mep:
+                    enriched_meps.append(detailed_mep)
                     self.stats['items_scraped'] += 1
 
-            return meps
+            return enriched_meps
 
         except Exception as e:
             self.log_error(f"API parsing error: {e}")
@@ -107,29 +132,56 @@ class MEPsScraper(BaseScraper):
         Parse MEP data from API response.
 
         Args:
-            item: Raw API data item
+            item: Raw API data item from EP API v2
 
         Returns:
             Parsed MEP dictionary or None if invalid
+
+        Note:
+            EP API v2 returns basic info in list endpoint.
+            For full details (party, group, email), need to call individual MEP endpoint.
+            For MVP, we store basic info and can enhance later.
         """
         try:
-            # Extract data (field names may vary based on actual API)
+            # Extract EP ID (from 'identifier' field)
+            ep_id = self._extract_int(item, ['identifier', 'id', 'notation_codictPersonId'])
+
+            if not ep_id:
+                # Try parsing from 'id' field like "person/124877"
+                id_str = item.get('id', '')
+                if '/' in id_str:
+                    try:
+                        ep_id = int(id_str.split('/')[-1])
+                    except ValueError:
+                        pass
+
+            # Extract names
+            full_name = self._extract_str(item, ['label', 'fullName', 'name'])
+            first_name = self._extract_str(item, ['givenName', 'firstName'])
+            last_name = self._extract_str(item, ['familyName', 'lastName', 'surname'])
+
+            # Extract email (if present in basic response)
+            email = self._extract_str(item, ['hasEmail', 'email', 'contactEmail'])
+            if email and email.startswith('mailto:'):
+                email = email.replace('mailto:', '')
+
+            # Build MEP dict with available data
             mep = {
-                'ep_id': self._extract_int(item, ['id', 'mepId', 'identifier']),
-                'full_name': self._extract_str(item, ['label', 'fullName', 'name']),
-                'first_name': self._extract_str(item, ['givenName', 'firstName']),
-                'last_name': self._extract_str(item, ['familyName', 'lastName', 'surname']),
-                'national_party': self._extract_nested(item, ['nationalParty', 'label']),
-                'ep_group': self._extract_nested(item, ['politicalGroup', 'label']),
-                'email': self._extract_str(item, ['email', 'contactEmail']),
-                'photo_url': self._extract_str(item, ['img', 'photoUrl', 'image']),
-                'website_url': self._extract_str(item, ['homepage', 'websiteUrl']),
-                'term_start': self._extract_date(item, ['mandateStartDate', 'termStart']),
-                'term_end': self._extract_date(item, ['mandateEndDate', 'termEnd']),
-                'is_active': item.get('isActive', True)
+                'ep_id': ep_id,
+                'full_name': full_name,
+                'first_name': first_name,
+                'last_name': last_name,
+                'national_party': None,  # Not in basic API response
+                'ep_group': None,  # Not in basic API response
+                'email': email,
+                'photo_url': None,  # Not in basic API response
+                'website_url': None,  # Not in basic API response
+                'term_start': None,  # Not in basic API response
+                'term_end': None,  # Not in basic API response
+                'is_active': True  # Assume active if returned by API
             }
 
-            # Generate slug if not provided
+            # Generate slug
             if not mep.get('slug'):
                 mep['slug'] = self._generate_slug(mep['full_name'])
 
@@ -138,6 +190,108 @@ class MEPsScraper(BaseScraper):
         except Exception as e:
             self.log_warning(f"Failed to parse MEP: {e}")
             return None
+
+    def _fetch_mep_details(self, mep: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """
+        Fetch detailed information for a specific MEP from individual endpoint.
+
+        Args:
+            mep: Basic MEP dict with at least ep_id
+
+        Returns:
+            Enhanced MEP dict with full details or None if fetch fails
+        """
+        ep_id = mep.get('ep_id')
+        if not ep_id:
+            return mep
+
+        try:
+            # Individual MEP endpoint
+            url = f"{self.base_url}/meps/{ep_id}"
+            params = {'format': 'application/ld+json'}
+
+            response = self.http.get(url, params=params)
+            data = response.json()
+
+            # Extract detailed info
+            items = data.get('data', [])
+            if not items:
+                return mep
+
+            detail = items[0]
+
+            # Extract email
+            email = detail.get('hasEmail', '')
+            if email and email.startswith('mailto:'):
+                email = email.replace('mailto:', '')
+                mep['email'] = email
+
+            # Extract photo URL
+            photo_url = detail.get('img', '')
+            if photo_url:
+                mep['photo_url'] = photo_url
+
+            # Extract current memberships (hasMembership array)
+            memberships = detail.get('hasMembership', [])
+
+            # Find current mandate (MEMBER_PARLIAMENT role)
+            current_mandate = None
+            for membership in memberships:
+                role = membership.get('role', '')
+                if 'MEMBER_PARLIAMENT' in role:
+                    member_during = membership.get('memberDuring', {})
+                    end_date = member_during.get('endDate')
+                    # If no end date or end date is in future, it's current
+                    if not end_date or end_date >= '2024':
+                        current_mandate = membership
+                        break
+
+            if current_mandate:
+                member_during = current_mandate.get('memberDuring', {})
+                mep['term_start'] = member_during.get('startDate')
+                mep['term_end'] = member_during.get('endDate')
+
+            # Find current EU political group
+            for membership in memberships:
+                classification = membership.get('membershipClassification', '')
+                if 'EU_POLITICAL_GROUP' in classification:
+                    member_during = membership.get('memberDuring', {})
+                    end_date = member_during.get('endDate')
+                    # Current group (no end date = ongoing)
+                    if not end_date:
+                        org_id = membership.get('organization', '')
+                        # Map organization ID to group name (simplified)
+                        mep['ep_group'] = self._get_group_name(org_id)
+                        break
+
+            # Find national political party
+            for membership in memberships:
+                classification = membership.get('membershipClassification', '')
+                if 'NATIONAL_POLITICAL_GROUP' in classification:
+                    member_during = membership.get('memberDuring', {})
+                    end_date = member_during.get('endDate')
+                    # Current party (no end date = ongoing)
+                    if not end_date:
+                        org_id = membership.get('organization', '')
+                        mep['national_party'] = self._get_party_name(org_id)
+                        break
+
+            self.log_info(f"  ✓ Enriched: {mep['full_name']}")
+            return mep
+
+        except Exception as e:
+            self.log_warning(f"Failed to fetch details for MEP {ep_id}: {e}")
+            return mep  # Return basic info if detail fetch fails
+
+    def _get_group_name(self, org_id: str) -> Optional[str]:
+        """Map organization ID to EP group name."""
+        from scripts.utils.ep_organizations import get_group_short_name
+        return get_group_short_name(org_id)
+
+    def _get_party_name(self, org_id: str) -> Optional[str]:
+        """Map organization ID to national party name."""
+        from scripts.utils.ep_organizations import get_party_short_name
+        return get_party_short_name(org_id)
 
     def _scrape_from_web(self) -> List[Dict[str, Any]]:
         """

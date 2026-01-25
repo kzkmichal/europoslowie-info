@@ -172,12 +172,30 @@ python scripts/seed_database.py --minimal
 ```
 europrojekt/
 ├── frontend/              # Next.js 16 application
-│   ├── app/               # Next.js App Router pages (to be built)
+│   ├── app/               # Next.js App Router pages ✅
+│   │   ├── page.tsx       # Homepage (MEPs list)
+│   │   ├── poslowie/[slug]/page.tsx  # MEP profile
+│   │   ├── glosowania/[id]/page.tsx  # Vote details
+│   │   ├── top-glosowania/page.tsx   # Top votes
+│   │   ├── metodologia/page.tsx      # Methodology
+│   │   └── o-projekcie/page.tsx      # About
+│   ├── components/        # React components ✅
+│   │   ├── Container.tsx
+│   │   ├── Header.tsx
+│   │   ├── Footer.tsx
+│   │   ├── MEPCard.tsx
+│   │   ├── VoteCard.tsx
+│   │   ├── StatsTable.tsx
+│   │   ├── VotingBreakdown.tsx
+│   │   ├── MEPVoteList.tsx
+│   │   └── CommitteeList.tsx
 │   ├── lib/
-│   │   └── db/            # Drizzle ORM setup
-│   │       ├── index.ts   # Database connection
-│   │       ├── schema.ts  # Drizzle schema
-│   │       └── queries.ts # Query functions
+│   │   ├── db/            # Drizzle ORM setup ✅
+│   │   │   ├── index.ts   # Database connection
+│   │   │   ├── schema.ts  # Drizzle schema
+│   │   │   └── queries.ts # Query functions
+│   │   ├── types.ts       # TypeScript types ✅
+│   │   └── utils.ts       # Utilities (cn) ✅
 │   ├── scripts/           # Frontend test scripts
 │   │   ├── test-db-connection.ts
 │   │   └── test-queries.ts
@@ -203,7 +221,10 @@ europrojekt/
 - [x] Set up Next.js 16 frontend infrastructure
 - [x] Install and configure Drizzle ORM
 - [x] Create database schema and query functions
-- [ ] Build Next.js frontend pages (data layer ready)
+- [x] Build Next.js frontend pages (6 pages + 10 components)
+- [x] Implement TypeScript type system with BaseProps
+- [x] Add responsive design and Polish localization
+- [ ] Populate database with real MEP data
 - [ ] Implement Python scrapers (see `docs/SCRAPING_STRATEGY.md`)
 - [ ] Configure AI processing (see `docs/AI_PROMPTS.md`)
 - [ ] Deploy to Vercel + Supabase

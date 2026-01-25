@@ -29,7 +29,7 @@ class HTTPClient:
 
         self.session = requests.Session()
         self.session.headers.update({
-            'User-Agent': user_agent or 'EuroposłowieInfo/1.0 (https://github.com/YOUR_USERNAME/europoslowie-info)',
+            'User-Agent': user_agent or 'EuroposlowieInfo/1.0 (https://github.com/YOUR_USERNAME/europoslowie-info)',
             'Accept': 'application/json, text/html',
             'Accept-Language': 'pl,en;q=0.9',
         })
