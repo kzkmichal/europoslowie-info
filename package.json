@@ -1,0 +1,18 @@
+{
+  "name": "europoslowie-info",
+  "version": "1.0.0",
+  "description": "Polish MEPs monitoring platform",
+  "private": true,
+  "scripts": {
+    "dev": "npm --prefix frontend run dev",
+    "build": "npm --prefix frontend run build",
+    "start": "npm --prefix frontend start",
+    "lint": "npm --prefix frontend run lint",
+    "db:test": "npm --prefix frontend run db:test",
+    "db:test:queries": "npm --prefix frontend run db:test:queries",
+    "db:studio": "npm --prefix frontend run db:studio"
+  },
+  "keywords": ["european-parliament", "meps", "poland", "voting-records"],
+  "author": "",
+  "license": "MIT"
+}
