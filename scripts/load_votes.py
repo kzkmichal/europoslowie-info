@@ -328,6 +328,11 @@ class VotesLoader:
                     'votes_for': template['votes_for'],
                     'votes_against': template['votes_against'],
                     'votes_abstain': template['votes_abstain'],
+                    'document_reference': template.get('document_reference'),
+                    'context_ai': template.get('context_ai'),
+                    'topic_category': template.get('topic_category'),
+                    'is_main': template.get('is_main', False),
+                    'dec_label': template.get('dec_label'),
                 }
                 absent_records.append(absent_record)
 
@@ -361,6 +366,11 @@ class VotesLoader:
                 'votes_for': record.get('votes_for'),
                 'votes_against': record.get('votes_against'),
                 'votes_abstain': record.get('votes_abstain'),
+                'document_reference': record.get('document_reference'),
+                'context_ai': record.get('context_ai'),
+                'topic_category': record.get('topic_category'),
+                'is_main': record.get('is_main', False),
+                'dec_label': record.get('dec_label'),
             }
             insert_data.append(vote_data)
 

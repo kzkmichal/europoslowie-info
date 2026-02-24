@@ -1,10 +1,18 @@
 import Link from 'next/link'
-import type { Vote } from '@/lib/db/schema'
 import type { BaseProps } from '@/lib/types'
 import { cn } from '@/lib/utils'
 
+type VoteCardVote = {
+  id: number
+  voteNumber?: string | null
+  title: string
+  date: Date | null
+  result?: string | null
+  starsPoland?: number | null
+}
+
 type VoteCardProps = BaseProps & {
-  vote: Vote
+  vote: VoteCardVote
 }
 
 export function VoteCard({
@@ -16,7 +24,7 @@ export function VoteCard({
 }: VoteCardProps) {
   return (
     <Link
-      href={`/glosowania/${vote.id}`}
+      href={`/glosowania/${vote.voteNumber ?? vote.id}`}
       className={cn(
         'block rounded-lg border border-gray-200 bg-white p-4',
         'shadow-sm transition-shadow hover:shadow-md',
@@ -35,6 +43,7 @@ export function VoteCard({
             year: 'numeric',
             month: 'long',
             day: 'numeric',
+            timeZone: 'UTC',
           })}
         </div>
       )}

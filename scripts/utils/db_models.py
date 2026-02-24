@@ -89,6 +89,8 @@ class Vote(Base):
     polish_votes_absent = Column('polish_votes_absent', Integer)
     topic_category = Column('topic_category', String(100))
     policy_area = Column('policy_area', String(100))
+    is_main = Column('is_main', Boolean, nullable=False, default=False)
+    dec_label = Column('dec_label', Text)
     created_at = Column('created_at', DateTime, default=datetime.now)
     updated_at = Column('updated_at', DateTime, default=datetime.now, onupdate=datetime.now)
 
