@@ -1,13 +1,16 @@
 import { getAllMEPsWithStats } from '@/lib/db/queries'
 import { Container } from '@/components/Container'
-import { MEPCard } from '@/components/MEPCard'
+import { MEPGrid } from '@/components/MEPGrid'
 
-export const metadata = {
-  title: 'Polscy Europosłowie - Lista posłów w PE | Europosłowie.info',
-  description:
-    'Pełna lista 53 polskich europosłów w Parlamencie Europejskim. Sprawdź statystyki obecności, głosowania i aktywność każdego posła.',
+export function generateMetadata() {
+  const metadata = {
+    title: 'Polscy Europosłowie - Lista posłów w PE | Europosłowie.info',
+    description:
+      'Pełna lista 53 polskich europosłów w Parlamencie Europejskim. Sprawdź statystyki obecności, głosowania i aktywność każdego posła.',
+  }
+
+  return metadata
 }
-
 export default async function HomePage() {
   const meps = await getAllMEPsWithStats()
 
@@ -25,15 +28,7 @@ export default async function HomePage() {
             Monitorujemy aktywność {meps.length} polskich posłów
           </p>
         </div>
-
-        {/* MEPs Grid */}
-        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {meps.map((mep) => (
-            <MEPCard key={mep.id} mep={mep} />
-          ))}
-        </div>
-
-        {/* Empty State */}
+        <MEPGrid meps={meps} />
         {meps.length === 0 && (
           <div className="rounded-lg border-2 border-dashed border-gray-300 p-12 text-center">
             <p className="text-gray-600">Brak danych o posłach</p>
