@@ -5,6 +5,7 @@
   integer,
   boolean,
   timestamp,
+  date,
   text,
   jsonb,
   real,
@@ -55,8 +56,8 @@ export const monthlyStats = pgTable('monthly_stats', {
 export const votingSessions = pgTable('voting_sessions', {
   id: serial('id').primaryKey(),
   sessionNumber: varchar('session_number', { length: 50 }).notNull().unique(),
-  startDate: timestamp('start_date').notNull(),
-  endDate: timestamp('end_date').notNull(),
+  startDate: date('start_date', { mode: 'date' }).notNull(),
+  endDate: date('end_date', { mode: 'date' }).notNull(),
   location: varchar('location', { length: 100 }),
   sessionType: varchar('session_type', { length: 50 }),
   status: varchar('status', { length: 50 }).notNull().default('completed'),
@@ -74,7 +75,7 @@ export const votes = pgTable('votes', {
   voteNumber: varchar('vote_number', { length: 50 }),
   title: text('title').notNull(),
   titleEn: text('title_en'),
-  date: timestamp('date', { mode: 'date' }).notNull(),
+  date: date('date', { mode: 'date' }).notNull(),
   voteChoice: varchar('vote_choice', { length: 20 }).notNull(), // FOR, AGAINST, ABSTAIN, ABSENT
   result: varchar('result', { length: 20 }), // ADOPTED, REJECTED
   votesFor: integer('votes_for'),
@@ -107,6 +108,8 @@ export const votes = pgTable('votes', {
   polishVotesAbsent: integer('polish_votes_absent'),
   topicCategory: varchar('topic_category', { length: 100 }),
   policyArea: varchar('policy_area', { length: 100 }),
+  isMain: boolean('is_main').notNull().default(false),
+  decLabel: text('dec_label'),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
 })
@@ -119,8 +122,8 @@ export const questions = pgTable('questions', {
   questionNumber: varchar('question_number', { length: 50 }).notNull().unique(),
   questionText: text('question_text').notNull(),
   addressedTo: varchar('addressed_to', { length: 255 }).notNull(),
-  dateSubmitted: timestamp('date_submitted').notNull(),
-  dateAnswered: timestamp('date_answered'),
+  dateSubmitted: date('date_submitted', { mode: 'date' }).notNull(),
+  dateAnswered: date('date_answered', { mode: 'date' }),
   answerText: text('answer_text'),
   answeredBy: varchar('answered_by', { length: 255 }),
   qualityScore: integer('quality_score'),
@@ -133,7 +136,7 @@ export const speeches = pgTable('speeches', {
     .notNull()
     .references(() => meps.id),
   debateTopic: text('debate_topic').notNull(),
-  speechDate: timestamp('speech_date').notNull(),
+  speechDate: date('speech_date', { mode: 'date' }).notNull(),
   durationSeconds: integer('duration_seconds'),
   transcript: text('transcript'),
   videoUrl: text('video_url'),
@@ -150,8 +153,8 @@ export const committeeMemberships = pgTable('committee_memberships', {
   committeeCode: varchar('committee_code', { length: 20 }).notNull(),
   committeeName: varchar('committee_name', { length: 255 }).notNull(),
   role: varchar('role', { length: 50 }).notNull(), // member, substitute, chair, vice-chair
-  fromDate: timestamp('from_date').notNull(),
-  toDate: timestamp('to_date'),
+  fromDate: date('from_date', { mode: 'date' }).notNull(),
+  toDate: date('to_date', { mode: 'date' }),
   isCurrent: boolean('is_current').notNull().default(true),
 })
 

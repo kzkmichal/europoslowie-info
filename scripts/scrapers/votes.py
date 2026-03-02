@@ -1,473 +1,700 @@
 """Scraper for European Parliament voting results."""
 import re
 import xml.etree.ElementTree as ET
-from typing import List, Dict, Any, Optional, Tuple
+from typing import List, Dict, Any, Optional, Set
 from datetime import datetime
 from .base import BaseScraper
 
 
 class VotesScraper(BaseScraper):
     """
-    Scraper for voting results - largest and most complex dataset.
+    Scraper for voting results using EP Open Data API v2.
 
     This scraper collects:
     - Vote metadata (title, date, result, document references)
     - Individual MEP votes (FOR, AGAINST, ABSTAIN, ABSENT)
     - Vote breakdowns (total counts)
+
+    Data flow (3-endpoint pipeline per session):
+    1. /meetings/{id}/vote-results   → build vot_map: VOT-ITM-ID → clean title, doc ref, context_ai
+    2. /meetings/{id}/decisions      → per DEC, link to VOT-ITM via inverse_consists_of
+    3. /plenary-documents/{doc-id}   → optional enrichment for topic_category / policy_area
+
+    Why 3 endpoints?
+    - DEC level (decisions) contains voter lists but only ugly technical titles
+      e.g. "A10-0195/2025 - Inese Vaidere - Wstępne porozumienie - Popr. 27"
+    - VOT-ITM level (vote-results) contains the clean human-readable title
+      e.g. "Stopniowe odchodzenie od importu gazu ziemnego z Rosji..."
+    - DEC links back to its parent VOT-ITM via 'inverse_consists_of'
     """
 
-    # European Parliament voting results
-    API_BASE_URL = "https://www.europarl.europa.eu/plenary/en"
-    WEB_BASE_URL = "https://www.europarl.europa.eu/plenary/en"
+    # European Parliament Open Data API
+    API_BASE_URL = "https://data.europarl.europa.eu/api/v2"
 
-    def __init__(self):
-        """Initialize votes scraper."""
+    # Mapping of EP subject-matter codes → Polish category names
+    SUBJECT_MATTER_MAP = {
+        'ENER': 'Energia',
+        'ENVI': 'Środowisko',
+        'AGRI': 'Rolnictwo',
+        'BUDG': 'Budżet',
+        'ECON': 'Gospodarka',
+        'EMPL': 'Zatrudnienie',
+        'FORE': 'Sprawy zagraniczne',
+        'JUST': 'Sprawiedliwość i praworządność',
+        'TRAN': 'Transport',
+        'HEAL': 'Zdrowie',
+        'CULT': 'Kultura i edukacja',
+        'AFET': 'Sprawy zagraniczne',
+        'DEVE': 'Rozwój i współpraca',
+        'INTA': 'Handel międzynarodowy',
+        'LIBE': 'Wolności obywatelskie',
+        'REGI': 'Polityka regionalna',
+        'ITRE': 'Przemysł i badania',
+        'JURI': 'Prawny',
+        'PCOM': 'Petycje',
+        'CONT': 'Kontrola budżetowa',
+        'PECH': 'Rybołówstwo',
+        'IMCO': 'Rynek wewnętrzny',
+    }
+
+    def __init__(self, enrich_documents: bool = False):
+        """
+        Initialize votes scraper.
+
+        Args:
+            enrich_documents: If True, fetch /plenary-documents/{doc-id} for each unique
+                              document to get topic_category / policy_area.
+                              Adds ~20-30 extra API calls per session but enriches data.
+        """
         super().__init__(
-            base_url=self.WEB_BASE_URL,
-            rate_limit_seconds=3.0  # More conservative for larger dataset
+            base_url=self.API_BASE_URL,
+            rate_limit_seconds=2.0  # Conservative rate limiting (EP: 500 req / 5 min)
         )
+        self.enrich_documents = enrich_documents
 
     def scrape(
         self,
-        session_number: str,
+        meeting_id: str,
         year: Optional[int] = None,
-        month: Optional[int] = None
+        month: Optional[int] = None,
+        calculate_absent: bool = True
     ) -> List[Dict[str, Any]]:
         """
-        Scrape voting results for a specific session.
+        Scrape voting results for a specific meeting.
 
         Args:
-            session_number: Session identifier (e.g., "2024-11-I")
-            year: Year (extracted from session_number if not provided)
-            month: Month (extracted from session_number if not provided)
+            meeting_id: Meeting identifier (e.g., "MTG-PL-2024-12-15")
+            year: Year (optional, for logging)
+            month: Month (optional, for logging)
+            calculate_absent: Whether to calculate ABSENT votes (default: True)
 
         Returns:
             List of vote record dictionaries (one per MEP per vote)
 
         Note:
             A single vote has ~700 MEP vote records (one for each MEP).
-            A session typically has 150-200 votes.
-            So one session = ~100,000+ records.
+            A session typically has 100-200 votes.
+            So one session = ~70,000-140,000 records.
         """
-        self.log_info(f"Starting votes scraping for session {session_number}...")
+        self.log_info(f"Starting votes scraping for meeting {meeting_id}...")
 
-        # Extract year/month from session_number if not provided
-        if year is None or month is None:
-            year, month = self._parse_session_number(session_number)
-
-        # Try to get voting results
         try:
-            votes = self._scrape_session_votes(session_number, year, month)
-            if votes:
+            # Step 1: Fetch VOT-ITM level data to build the title map
+            self.log_info("Fetching vote-results for clean VOT-ITM title mapping...")
+            vote_results = self._fetch_vote_results(meeting_id)
+            vot_map = self._build_vot_map(vote_results)
+            self.log_info(f"Built VOT-ITM map with {len(vot_map)} entries")
+
+            # Step 1b (optional): Enrich with plenary document topic data
+            doc_map: Dict[str, Dict] = {}
+            if self.enrich_documents:
+                self.log_info("Enriching with plenary document data...")
+                doc_map = self._build_doc_map(vot_map)
+                self.log_info(f"Enriched {len(doc_map)} unique documents")
+
+            # Step 2: Fetch all decisions (contain voter lists)
+            all_vote_records = []
+            offset = 0
+            limit = 100
+            total_decisions = 0
+            seen_decision_ids: Set[str] = set()
+
+            while True:
+                decisions_data = self._fetch_decisions(meeting_id, offset, limit)
+
+                if not decisions_data:
+                    break
+
+                decisions = self._extract_decisions_list(decisions_data)
+
+                if not decisions:
+                    break
+
+                # Detect pagination loop
+                new_decisions = []
+                for d in decisions:
+                    d_id = d.get('@id') or d.get('id') or str(d)
+                    if d_id not in seen_decision_ids:
+                        seen_decision_ids.add(d_id)
+                        new_decisions.append(d)
+
+                if not new_decisions:
+                    self.log_info("No new decisions in batch - pagination complete")
+                    break
+
                 self.log_info(
-                    f"✓ Scraped {len(votes)} vote records from session {session_number}"
+                    f"Processing batch: {len(new_decisions)} decisions "
+                    f"(offset {offset})"
                 )
-                return votes
+
+                for decision in new_decisions:
+                    vote_records = self._parse_decision(
+                        decision,
+                        meeting_id,
+                        vot_map,
+                        doc_map,
+                        calculate_absent
+                    )
+                    all_vote_records.extend(vote_records)
+                    total_decisions += 1
+
+                if len(decisions) < limit:
+                    break  # Last batch
+
+                offset += limit
+
+            self.log_info(
+                f"✓ Scraped {len(all_vote_records)} vote records from "
+                f"{total_decisions} decisions in meeting {meeting_id}"
+            )
+
+            return all_vote_records
+
         except Exception as e:
             self.log_error(f"Scraping failed: {e}", exc_info=True)
             raise
 
-        return []
+    # -------------------------------------------------------------------------
+    # Step 1: VOT-ITM level — clean titles via /vote-results
+    # -------------------------------------------------------------------------
 
-    def _parse_session_number(self, session_number: str) -> Tuple[int, int]:
+    def _fetch_vote_results(self, meeting_id: str) -> List[Dict]:
         """
-        Extract year and month from session number.
+        Fetch VOT-ITM level data from /meetings/{id}/vote-results.
 
-        Args:
-            session_number: Session identifier (e.g., "2024-11-I")
+        Each item represents one voting topic (group of related DECs) and contains:
+        - activity_label.pl: clean human-readable Polish title
+        - based_on_a_realization_of: document ID (e.g. "eli/dl/doc/A-10-2025-0195")
+        - structuredLabel.pl: XML with <title> and <label> (rapporteur, doc ref, majority type)
+        - consists_of: list of child DEC IDs
 
         Returns:
-            Tuple of (year, month)
+            List of VOT-ITM objects, empty list on failure
         """
-        match = re.match(r'^(\d{4})-(\d{2})-', session_number)
-        if match:
-            return int(match.group(1)), int(match.group(2))
-        raise ValueError(f"Invalid session_number format: {session_number}")
-
-    def _scrape_session_votes(
-        self,
-        session_number: str,
-        year: int,
-        month: int
-    ) -> List[Dict[str, Any]]:
-        """
-        Scrape all votes from a single session.
-
-        Args:
-            session_number: Session identifier
-            year: Year
-            month: Month
-
-        Returns:
-            List of vote records
-        """
-        self.log_info(f"Fetching votes for session {session_number}")
-
-        # Step 1: Try to get voting results XML
-        # EP publishes voting results as XML files
-        xml_content = self._fetch_voting_results_xml(session_number, year, month)
-
-        if not xml_content:
-            self.log_warning("No voting results XML found, using mock data")
-            return self._get_mock_votes(session_number)
-
-        # Step 2: Parse XML
-        all_vote_records = self._parse_voting_results_xml(
-            xml_content,
-            session_number
-        )
-
-        return all_vote_records
-
-    def _fetch_voting_results_xml(
-        self,
-        session_number: str,
-        year: int,
-        month: int
-    ) -> Optional[str]:
-        """
-        Fetch voting results XML file from EP website.
-
-        Args:
-            session_number: Session identifier
-            year: Year
-            month: Month
-
-        Returns:
-            XML content as string, or None if not found
-
-        Note:
-            EP publishes voting results in various URL patterns.
-            Common patterns:
-            - /doceo/document/PV-{term}-{session}-RCV_FR.xml
-            - /sides/getDoc.do?type=PV&reference={date}&format=XML
-        """
-        self.log_info("Attempting to fetch voting results XML...")
-
-        # Try different URL patterns
-        url_patterns = [
-            # Pattern 1: Direct XML file (most common)
-            f"{self.base_url}/doceo/document/PV-10-{year}-{month:02d}-RCV_FR.xml",
-
-            # Pattern 2: getDoc API
-            f"{self.base_url}/sides/getDoc.do?type=PV&reference={year}{month:02d}&format=XML",
-
-            # Pattern 3: Session-specific
-            f"{self.base_url}/votes?term=10&session={session_number}",
-        ]
-
-        for url in url_patterns:
-            try:
-                self.log_info(f"Trying URL: {url}")
-                response = self.http.get(url, timeout=30)
-
-                if response.status_code == 200:
-                    content_type = response.headers.get('content-type', '')
-
-                    # Check if response is XML
-                    if 'xml' in content_type.lower() or url.endswith('.xml'):
-                        self.log_info("✓ Found XML voting results")
-                        return response.text
-
-                    # If HTML, might contain download link
-                    if 'html' in content_type.lower():
-                        # TODO: Parse HTML to find XML download link
-                        self.log_warning("Got HTML instead of XML, need to parse")
-
-            except Exception as e:
-                self.log_warning(f"Failed to fetch {url}: {e}")
-                continue
-
-        self.log_warning("Could not fetch voting results XML from any source")
-        return None
-
-    def _parse_voting_results_xml(
-        self,
-        xml_content: str,
-        session_number: str
-    ) -> List[Dict[str, Any]]:
-        """
-        Parse voting results XML file.
-
-        Args:
-            xml_content: XML content as string
-            session_number: Session identifier
-
-        Returns:
-            List of vote records (one per MEP per vote)
-
-        Note:
-            EP voting XML structure (simplified):
-            <RollCallVotes>
-              <RollCallVote.Result>
-                <Identifier>Vote 1</Identifier>
-                <Title>Amendment 123...</Title>
-                <Result>Adopted</Result>
-                <TotalVotes For="420" Against="180" Abstentions="50"/>
-                <Result.Description>
-                  <Result.Description.Text Language="EN">
-                    <Member.Name>John SMITH</Member.Name>
-                    <Vote>+</Vote>  <!-- +/-/0/abs -->
-                  </Result.Description.Text>
-                </Result.Description>
-              </RollCallVote.Result>
-            </RollCallVotes>
-
-            Actual structure may vary!
-        """
-        self.log_info("Parsing voting results XML...")
-
-        try:
-            root = ET.fromstring(xml_content)
-        except ET.ParseError as e:
-            self.log_error(f"Failed to parse XML: {e}")
-            return []
-
-        all_vote_records = []
-
-        # Find all individual votes
-        # XML structure varies, try common patterns
-        vote_elements = (
-            root.findall('.//RollCallVote.Result') or
-            root.findall('.//Vote') or
-            root.findall('.//*[@Identifier]')
-        )
-
-        self.log_info(f"Found {len(vote_elements)} votes in XML")
-
-        for vote_elem in vote_elements:
-            # Parse common vote information
-            vote_common = self._parse_vote_metadata(vote_elem, session_number)
-
-            if not vote_common:
-                continue
-
-            # Parse individual MEP votes for this vote
-            mep_votes = self._parse_mep_votes(vote_elem)
-
-            # Create one record per MEP
-            for mep_vote in mep_votes:
-                vote_record = {
-                    **vote_common,  # Common vote info
-                    **mep_vote  # MEP-specific info
-                }
-                all_vote_records.append(vote_record)
-                self.stats['items_scraped'] += 1
-
-        self.log_info(
-            f"Parsed {len(all_vote_records)} individual vote records "
-            f"from {len(vote_elements)} votes"
-        )
-
-        return all_vote_records
-
-    def _parse_vote_metadata(
-        self,
-        vote_elem: ET.Element,
-        session_number: str
-    ) -> Optional[Dict[str, Any]]:
-        """
-        Parse common vote information from XML element.
-
-        Args:
-            vote_elem: XML element for a single vote
-            session_number: Session identifier
-
-        Returns:
-            Dictionary with common vote info, or None if invalid
-        """
-        try:
-            # Vote identifier/number
-            vote_number = (
-                vote_elem.get('Identifier') or
-                vote_elem.findtext('Identifier') or
-                vote_elem.findtext('VoteNumber')
-            )
-
-            if not vote_number:
-                return None
-
-            # Vote title/subject
-            title = (
-                vote_elem.findtext('Title') or
-                vote_elem.findtext('Subject') or
-                vote_elem.findtext('.//Title[@Language="EN"]') or
-                "No title available"
-            )
-
-            # Vote date
-            date_str = (
-                vote_elem.findtext('Date') or
-                vote_elem.findtext('VoteDate') or
-                vote_elem.get('Date')
-            )
-
-            # Result (ADOPTED/REJECTED)
-            result = vote_elem.findtext('Result') or ''
-            result = self._normalize_result(result)
-
-            # Vote breakdown (total counts)
-            totals = self._parse_vote_totals(vote_elem)
-
-            # Document reference
-            doc_ref = (
-                vote_elem.findtext('Reference') or
-                vote_elem.findtext('DocumentReference') or
-                vote_elem.get('Reference')
-            )
-
-            return {
-                'session_number': session_number,
-                'vote_number': str(vote_number).strip(),
-                'title': title.strip()[:500],  # Limit length
-                'date': self._normalize_date(date_str) if date_str else None,
-                'result': result,
-                'total_for': totals.get('for', 0),
-                'total_against': totals.get('against', 0),
-                'total_abstain': totals.get('abstain', 0),
-                'document_reference': doc_ref
-            }
-
-        except Exception as e:
-            self.log_warning(f"Failed to parse vote metadata: {e}")
-            return None
-
-    def _parse_vote_totals(self, vote_elem: ET.Element) -> Dict[str, int]:
-        """
-        Parse total vote counts from XML element.
-
-        Args:
-            vote_elem: XML element
-
-        Returns:
-            Dictionary with 'for', 'against', 'abstain' counts
-        """
-        totals = {'for': 0, 'against': 0, 'abstain': 0}
-
-        # Try to find TotalVotes element
-        total_elem = vote_elem.find('.//TotalVotes')
-        if total_elem is not None:
-            totals['for'] = int(total_elem.get('For', 0))
-            totals['against'] = int(total_elem.get('Against', 0))
-            totals['abstain'] = int(total_elem.get('Abstentions', 0))
-        else:
-            # Try alternative structure
-            for_elem = vote_elem.findtext('.//For')
-            against_elem = vote_elem.findtext('.//Against')
-            abstain_elem = vote_elem.findtext('.//Abstentions')
-
-            if for_elem:
-                totals['for'] = int(for_elem)
-            if against_elem:
-                totals['against'] = int(against_elem)
-            if abstain_elem:
-                totals['abstain'] = int(abstain_elem)
-
-        return totals
-
-    def _parse_mep_votes(self, vote_elem: ET.Element) -> List[Dict[str, Any]]:
-        """
-        Parse how each MEP voted from XML element.
-
-        Args:
-            vote_elem: XML element for a single vote
-
-        Returns:
-            List of MEP vote dictionaries
-        """
-        mep_votes = []
-
-        # Try different XML structures for MEP votes
-        # Structure varies between different XML formats
-
-        # Pattern 1: Result.Description with Member.Name
-        for member_elem in vote_elem.findall('.//Member.Name'):
-            mep_name = member_elem.text
-            vote_choice = member_elem.get('Vote') or '?'
-
-            mep_votes.append({
-                'mep_name': mep_name.strip() if mep_name else None,
-                'vote_choice': self._normalize_vote_choice(vote_choice)
-            })
-
-        # Pattern 2: Individual Vote elements
-        if not mep_votes:
-            for mep_elem in vote_elem.findall('.//PoliticalGroup.Member'):
-                mep_id = mep_elem.get('MepId')
-                mep_name = mep_elem.get('Name')
-                vote_choice = mep_elem.get('Vote') or mep_elem.get('Choice')
-
-                mep_votes.append({
-                    'mep_ep_id': int(mep_id) if mep_id else None,
-                    'mep_name': mep_name.strip() if mep_name else None,
-                    'vote_choice': self._normalize_vote_choice(vote_choice)
-                })
-
-        # Pattern 3: Grouped by vote choice
-        if not mep_votes:
-            for choice in ['For', 'Against', 'Abstain', 'Absent']:
-                choice_elem = vote_elem.find(f'.//{choice}')
-                if choice_elem is not None:
-                    members_text = choice_elem.text or ''
-                    # Split by comma or newline
-                    members = re.split(r'[,\n]', members_text)
-                    for member in members:
-                        member = member.strip()
-                        if member:
-                            mep_votes.append({
-                                'mep_name': member,
-                                'vote_choice': self._normalize_vote_choice(choice)
-                            })
-
-        return mep_votes
-
-    def _normalize_vote_choice(self, choice: str) -> str:
-        """
-        Normalize vote choice to consistent values.
-
-        Args:
-            choice: Raw vote choice from XML
-
-        Returns:
-            Normalized choice: FOR, AGAINST, ABSTAIN, or ABSENT
-        """
-        if not choice:
-            return 'ABSENT'
-
-        choice = str(choice).strip().upper()
-
-        # Mapping of various formats to standard values
-        mapping = {
-            'FOR': 'FOR',
-            '+': 'FOR',
-            'YES': 'FOR',
-            'Y': 'FOR',
-            'AGAINST': 'AGAINST',
-            '-': 'AGAINST',
-            'NO': 'AGAINST',
-            'N': 'AGAINST',
-            'ABSTAIN': 'ABSTAIN',
-            'ABSTENTION': 'ABSTAIN',
-            'ABSTENTIONS': 'ABSTAIN',
-            '0': 'ABSTAIN',
-            'A': 'ABSTAIN',
-            'ABSENT': 'ABSENT',
-            'ABS': 'ABSENT',
-            'DID NOT VOTE': 'ABSENT',
-            '': 'ABSENT',
+        url = f"{self.base_url}/meetings/{meeting_id}/vote-results"
+        params = {
+            'format': 'application/ld+json',
+            'json-layout': 'framed',
         }
 
-        return mapping.get(choice, 'ABSENT')
+        try:
+            response = self.http.get(url, params=params, timeout=90)
+
+            if response.status_code == 404:
+                self.log_warning(f"vote-results not found for {meeting_id} (404)")
+                return []
+
+            response.raise_for_status()
+            data = response.json()
+            return self._extract_decisions_list(data)
+
+        except Exception as e:
+            self.log_error(f"Failed to fetch vote-results for {meeting_id}: {e}")
+            return []
+
+    def _build_vot_map(self, vote_results: List[Dict]) -> Dict[str, Dict]:
+        """
+        Build mapping from VOT-ITM full URI to metadata.
+
+        Key format: "eli/dl/event/MTG-PL-2025-12-17-VOT-ITM-978310"
+        (matches the value in DEC's inverse_consists_of field)
+
+        Returns dict structure:
+        {
+            "eli/dl/event/MTG-PL-2025-12-17-VOT-ITM-978310": {
+                "title_pl": "Stopniowe odchodzenie od importu gazu ziemnego z Rosji...",
+                "title_en": "Phasing out imports of Russian natural gas...",
+                "doc_id":   "A-10-2025-0195",
+                "context_ai": "Sprawozdanie: Inese Vaidere, Ville Niinistö (A10-0195/2025) (wymagana większość oddanych głosów)",
+            },
+            ...
+        }
+        """
+        vot_map = {}
+
+        for vot in vote_results:
+            vot_id = vot.get('id', '')
+            if not vot_id:
+                continue
+
+            # Get clean Polish/English titles, stripping reading markers (***I, ***II)
+            label = vot.get('activity_label', {})
+            title_pl = self._strip_reading_markers(
+                label.get('pl', '') or label.get('mul', '') or ''
+            )
+            title_en = self._strip_reading_markers(label.get('en', '') or '')
+
+            # Extract document ID from ELI URI: "eli/dl/doc/A-10-2025-0195" → "A-10-2025-0195"
+            doc_refs = vot.get('based_on_a_realization_of', [])
+            doc_id = None
+            if doc_refs:
+                first_ref = doc_refs[0]
+                doc_uri = first_ref if isinstance(first_ref, str) else first_ref.get('id', '')
+                doc_id = doc_uri.split('/')[-1] if doc_uri else None
+
+            # Parse structuredLabel XML to get context_ai (the <label> element)
+            structured_xml = vot.get('structuredLabel', {})
+            if isinstance(structured_xml, dict):
+                structured_xml = structured_xml.get('pl', '') or structured_xml.get('en', '') or ''
+            context_ai = self._parse_structured_label(structured_xml)
+
+            vot_map[vot_id] = {
+                'title_pl': title_pl,
+                'title_en': title_en,
+                'doc_id': doc_id,
+                'context_ai': context_ai,
+            }
+
+        return vot_map
+
+    def _strip_reading_markers(self, title: str) -> str:
+        """
+        Strip EP legislative reading markers from the end of titles.
+
+        Examples:
+            "Stopniowe odchodzenie... ***I"   → "Stopniowe odchodzenie..."
+            "Some title ***II"                → "Some title"
+            "Some title ***"                  → "Some title"
+        """
+        return re.sub(r'\s+\*{3}[IVX]*$', '', title).strip()
+
+    def _parse_structured_label(self, xml_str: str) -> Optional[str]:
+        """
+        Parse structuredLabel XML and return the <label> element as context_ai.
+
+        The <label> element contains a concise human-readable summary like:
+        "Sprawozdanie: Inese Vaidere, Ville Niinistö (A10-0195/2025) (wymagana większość oddanych głosów)"
+
+        Args:
+            xml_str: XML string like
+                "<structuredLabel><title>...</title><label>...</label></structuredLabel>"
+
+        Returns:
+            Label text, or None if parsing fails / element missing
+        """
+        if not xml_str:
+            return None
+        try:
+            root = ET.fromstring(xml_str)
+            label_text = root.findtext('label', '').strip()
+            return label_text or None
+        except ET.ParseError:
+            return None
+
+    # -------------------------------------------------------------------------
+    # Step 1b (optional): Document enrichment via /plenary-documents/{doc-id}
+    # -------------------------------------------------------------------------
+
+    def _fetch_plenary_document(self, doc_id: str) -> Optional[Dict]:
+        """
+        Fetch plenary document data for topic_category / policy_area enrichment.
+
+        Endpoint: /plenary-documents/{doc_id}?language=pl
+
+        Returns:
+            Document object or None if not found / failed
+        """
+        url = f"{self.base_url}/plenary-documents/{doc_id}"
+        params = {
+            'language': 'pl',
+            'format': 'application/ld+json',
+        }
+
+        try:
+            response = self.http.get(url, params=params, timeout=30)
+
+            if response.status_code == 404:
+                self.log_warning(f"Plenary document not found: {doc_id}")
+                return None
+
+            response.raise_for_status()
+            data = response.json()
+            items = self._extract_decisions_list(data)
+            return items[0] if items else None
+
+        except Exception as e:
+            self.log_warning(f"Failed to fetch plenary document {doc_id}: {e}")
+            return None
+
+    def _build_doc_map(self, vot_map: Dict[str, Dict]) -> Dict[str, Dict]:
+        """
+        Fetch plenary document data for all unique doc_ids in vot_map.
+
+        Returns:
+            Mapping doc_id → {topic_category, policy_area}
+        """
+        unique_docs = {v['doc_id'] for v in vot_map.values() if v.get('doc_id')}
+        doc_map: Dict[str, Dict] = {}
+
+        for doc_id in unique_docs:
+            doc_data = self._fetch_plenary_document(doc_id)
+            if doc_data:
+                subjects = doc_data.get('isAboutSubjectMatter', [])
+                topic_category = self._extract_topic_from_subject_matter(subjects)
+                doc_map[doc_id] = {
+                    'topic_category': topic_category,
+                    'policy_area': None,  # Can be derived from procedure if needed
+                }
+
+        return doc_map
+
+    def _extract_topic_from_subject_matter(self, subjects: List) -> Optional[str]:
+        """
+        Map EP subject-matter codes to Polish category names.
+        Takes the first code that has a known mapping.
+
+        Args:
+            subjects: List of subject URIs or codes like ["ENER", "PCOM"] or
+                     ["http://...def/ep-subject-matters/ENER", ...]
+
+        Returns:
+            Polish category name or None
+        """
+        for subject in subjects:
+            code = subject.split('/')[-1] if isinstance(subject, str) else str(subject)
+            if code in self.SUBJECT_MATTER_MAP:
+                return self.SUBJECT_MATTER_MAP[code]
+        return None
+
+    # -------------------------------------------------------------------------
+    # Step 2: DEC level — voter lists via /decisions
+    # -------------------------------------------------------------------------
+
+    def _fetch_decisions(
+        self,
+        meeting_id: str,
+        offset: int = 0,
+        limit: int = 100
+    ) -> Optional[Dict]:
+        """
+        Fetch decisions (individual votes with voter lists) from a meeting.
+
+        Args:
+            meeting_id: Meeting ID (e.g., 'MTG-PL-2025-12-15')
+            offset: Pagination offset
+            limit: Number of decisions to fetch
+
+        Returns:
+            JSON response or None if failed
+        """
+        url = f"{self.base_url}/meetings/{meeting_id}/decisions"
+        params = {
+            'format': 'application/ld+json',
+            'json-layout': 'framed',
+            'offset': offset,
+            'limit': limit
+        }
+
+        try:
+            response = self.http.get(url, params=params, timeout=30)
+
+            if response.status_code == 404:
+                self.log_warning(f"Meeting {meeting_id} not found (404)")
+                return None
+
+            response.raise_for_status()
+            return response.json()
+
+        except Exception as e:
+            self.log_error(f"Failed to fetch decisions: {e}")
+            return None
+
+    def _extract_decisions_list(self, data: Dict) -> List[Dict]:
+        """
+        Extract decisions list from JSON-LD response.
+
+        Handles different response structures:
+        - {"data": [...]}  (most common)
+        - {"@graph": [...]}
+        - [...]  (bare array)
+        - {...}  (single object)
+        """
+        if isinstance(data, list):
+            return data
+        elif isinstance(data, dict):
+            if 'data' in data:
+                return data['data'] if isinstance(data['data'], list) else [data['data']]
+            elif '@graph' in data:
+                return data['@graph']
+            else:
+                return [data]
+        return []
+
+    def _parse_decision(
+        self,
+        decision: Dict,
+        meeting_id: str,
+        vot_map: Dict[str, Dict],
+        doc_map: Dict[str, Dict],
+        calculate_absent: bool = True
+    ) -> List[Dict[str, Any]]:
+        """
+        Parse a single DEC decision and create per-MEP vote records.
+
+        Title resolution strategy:
+        1. Follow inverse_consists_of → parent VOT-ITM ID
+        2. Look up clean title in vot_map
+        3. Fallback to DEC-level activity_label if VOT-ITM not found
+
+        Args:
+            decision: DEC decision JSON object
+            meeting_id: Meeting identifier
+            vot_map: VOT-ITM URI → metadata mapping (from _build_vot_map)
+            doc_map: doc_id → topic data mapping (from _build_doc_map, may be empty)
+            calculate_absent: Whether to calculate ABSENT votes
+
+        Returns:
+            List of vote records (one per MEP who voted FOR/AGAINST/ABSTAIN)
+        """
+        try:
+            vote_id = decision.get('notation_votingId', 'N/A')
+
+            # --- Resolve clean title via VOT-ITM parent ---
+            inverse = decision.get('inverse_consists_of', [])
+            vot_uri = None
+            if inverse:
+                first = inverse[0]
+                vot_uri = first if isinstance(first, str) else first.get('id', '')
+
+            vot_data = vot_map.get(vot_uri, {}) if vot_uri else {}
+
+            if vot_data.get('title_pl'):
+                # ✅ Use clean VOT-ITM title
+                title_pl = vot_data['title_pl']
+                title_en = vot_data.get('title_en', '') or ''
+            else:
+                # Fallback: DEC-level title (ugly, but better than nothing)
+                activity_label = decision.get('activity_label', {})
+                title_pl = self._strip_reading_markers(activity_label.get('pl', ''))
+                title_en = self._strip_reading_markers(activity_label.get('en', ''))
+                if not title_pl and title_en:
+                    title_pl = title_en
+
+            # --- Enrich fields from VOT-ITM data ---
+            doc_id = vot_data.get('doc_id')
+            document_reference = doc_id  # e.g. "A-10-2025-0195"
+            context_ai = vot_data.get('context_ai')  # from structuredLabel <label>
+
+            # topic_category from optional plenary document enrichment
+            topic_category = None
+            if doc_id and doc_id in doc_map:
+                topic_category = doc_map[doc_id].get('topic_category')
+
+            # --- Standard DEC fields ---
+            date_str = decision.get('activity_date', '')
+
+            outcome_uri = decision.get('decision_outcome', '')
+            outcome = self._normalize_result(
+                outcome_uri.split('/')[-1] if outcome_uri else ''
+            )
+
+            votes_for = decision.get('number_of_votes_favor', 0)
+            votes_against = decision.get('number_of_votes_against', 0)
+            votes_abstain = decision.get('number_of_votes_abstention', 0)
+
+            # Only ROLLCALL votes have individual MEP votes
+            decision_method = decision.get('decision_method', '')
+            is_rollcall = 'ROLLCALL' in decision_method.upper()
+
+            if not is_rollcall:
+                self.log_info(
+                    f"Skipping vote {vote_id} - not a roll-call vote "
+                    f"(method: {decision_method})"
+                )
+                return []
+
+            # --- Extract voter lists ---
+            voters_for = decision.get('had_voter_favor', [])
+            voters_against = decision.get('had_voter_against', [])
+            voters_abstain = decision.get('had_voter_abstention', [])
+
+            person_ids_for = [self._extract_person_id(v) for v in voters_for]
+            person_ids_against = [self._extract_person_id(v) for v in voters_against]
+            person_ids_abstain = [self._extract_person_id(v) for v in voters_abstain]
+
+            # --- Detect is_main and extract dec_label from DEC activity_label ---
+            dec_label_raw = decision.get('activity_label', {})
+            dec_label_pl = dec_label_raw.get('pl', '')
+            dec_label_en = dec_label_raw.get('en', '')
+            is_main = self._is_main_vote(dec_label_pl, dec_label_en)
+            dec_label = self._extract_dec_label(dec_label_pl or dec_label_en)
+
+            # --- Build per-MEP vote records ---
+            common_data = {
+                'vote_number': str(vote_id),
+                'title': title_pl[:500] if title_pl else 'N/A',
+                'title_en': title_en[:500] if title_en else None,
+                'date': date_str,
+                'result': outcome,
+                'votes_for': votes_for,
+                'votes_against': votes_against,
+                'votes_abstain': votes_abstain,
+                'document_reference': document_reference,
+                'context_ai': context_ai,
+                'topic_category': topic_category,
+                'is_main': is_main,
+                'dec_label': dec_label,
+                'meeting_id': meeting_id,
+            }
+
+            vote_records = []
+
+            for person_id in person_ids_for:
+                vote_records.append({
+                    **common_data,
+                    'person_id': person_id,
+                    'vote_choice': 'FOR'
+                })
+
+            for person_id in person_ids_against:
+                vote_records.append({
+                    **common_data,
+                    'person_id': person_id,
+                    'vote_choice': 'AGAINST'
+                })
+
+            for person_id in person_ids_abstain:
+                vote_records.append({
+                    **common_data,
+                    'person_id': person_id,
+                    'vote_choice': 'ABSTAIN'
+                })
+
+            # Note: ABSENT calculation done in data loading phase
+            # (requires full MEP list, not available here)
+
+            self.stats['items_scraped'] += len(vote_records)
+            return vote_records
+
+        except Exception as e:
+            self.log_warning(f"Failed to parse decision: {e}")
+            return []
+
+    def _extract_dec_label(self, activity_label: str) -> str:
+        """
+        Extract the meaningful subject label from a DEC activity_label,
+        stripping the leading "DOCREF - RAPPORTEUR - " prefix.
+
+        DEC activity_label format:
+          "A10-0244/2025 - Andrzej Buła - ust. 7/2"
+          "A10-0195/2025 - Inese Vaidere, Ville Niinistö - Wstępne porozumienie - Popr. 27"
+
+        Returns:
+          "ust. 7/2"
+          "Wstępne porozumienie - Popr. 27"
+          (original string if format doesn't match)
+        """
+        if not activity_label:
+            return ''
+        # Split on first two " - " separators: [DOCREF, RAPPORTEUR(S), SUBJECT...]
+        parts = activity_label.split(' - ', 2)
+        if len(parts) == 3 and re.match(r'^[A-Z]\d+-\d+/\d{4}', parts[0]):
+            return parts[2].strip()
+        return activity_label.strip()
+
+    def _is_main_vote(self, dec_label_pl: str, dec_label_en: str = '') -> bool:
+        """
+        Detect whether this DEC is the "main" vote for a topic (equivalent to
+        HowTheyVote's is_main=True), as opposed to a sub-vote on a specific
+        amendment, recital, or paragraph.
+
+        Main vote markers in activity_label.pl:
+          - "całość tekstu"        → final vote on the whole resolution text
+          - "Wstępne porozumienie" → provisional legislative agreement
+          - "Wniosek o odrzucenie" → proposal to reject (key procedural vote)
+
+        Sub-vote markers (NOT main):
+          - "Motyw "               → vote on a specific recital (e.g. "Motyw E")
+          - "motywie "             → recital insertion (e.g. "Po motywie B")
+          - " ust. "               → vote on a specific paragraph
+          - "pkt "                 → vote on a specific point
+          - " art. "               → vote on a specific article
+          - "Załącznik"            → vote on an annex (e.g. "Załącznik, akapit pierwszy/2")
+          - "Zalecenie "           → recommendation section (e.g. "Zalecenie nr 3, akapit trzeci/2")
+          - "akapit "              → paragraph in annex/recommendation (e.g. "akapit pierwszy/2")
+
+        Edge case: "Wstępne porozumienie - Popr. 27" has "Popr." but IS main.
+        Edge case: "Wniosek o odrzucenie - Popr. 2" has "Popr." but IS main.
+        So we check main markers first before sub-vote markers.
+        """
+        label = dec_label_pl or dec_label_en
+
+        MAIN_MARKERS = [
+            'całość tekstu',        # final vote on whole resolution text
+            'Wstępne porozumienie', # provisional agreement (legislative)
+            'Wniosek o odrzucenie', # proposal to reject
+            'whole text',           # EN fallback
+            'Provisional agreement',
+            'Proposal to reject',
+        ]
+        SUB_MARKERS = [
+            'Motyw ',       # recital vote: "Motyw E", "Motyw J/1"
+            'motywie ',     # recital insertion: "Po motywie B", "Po motywie P"
+            ' ust. ',       # paragraph vote: "- ust. 2/2", "- ust. 7"
+            'pkt ',         # point vote
+            ' art. ',       # article vote
+            'Załącznik',    # annex vote: "Załącznik, akapit pierwszy/2"
+            'Zalecenie ',   # recommendation section: "Zalecenie nr 3, akapit trzeci/2"
+            'akapit ',      # paragraph within annex/recommendation: "akapit pierwszy/2"
+        ]
+
+        # Check main markers first (they override sub-vote markers)
+        if any(m in label for m in MAIN_MARKERS):
+            return True
+
+        # Check explicit sub-vote markers
+        if any(m in label for m in SUB_MARKERS):
+            return False
+
+        # Default: treat as main if no sub-vote markers found
+        # (covers simple resolution votes, procedural votes, agenda votes etc.)
+        return True
+
+    # -------------------------------------------------------------------------
+    # Helpers
+    # -------------------------------------------------------------------------
+
+    def _extract_person_id(self, person_uri: str) -> int:
+        """
+        Extract numeric EP person ID from URI.
+
+        Args:
+            person_uri: e.g. 'person/197498'
+
+        Returns:
+            Numeric EP ID (197498), or 0 if parsing fails
+        """
+        try:
+            return int(person_uri.split('/')[-1])
+        except (ValueError, IndexError, AttributeError):
+            return 0
 
     def _normalize_result(self, result: str) -> str:
         """
         Normalize vote result to consistent values.
 
-        Args:
-            result: Raw result from XML
-
         Returns:
-            Normalized result: ADOPTED or REJECTED
+            'ADOPTED', 'REJECTED', or 'UNKNOWN'
         """
         if not result:
             return 'UNKNOWN'
@@ -480,75 +707,6 @@ class VotesScraper(BaseScraper):
             return 'REJECTED'
         else:
             return 'UNKNOWN'
-
-    def _normalize_date(self, date_str: str) -> Optional[str]:
-        """
-        Normalize date to YYYY-MM-DD format.
-
-        Args:
-            date_str: Date string in various formats
-
-        Returns:
-            Date in YYYY-MM-DD format, or None
-        """
-        if not date_str:
-            return None
-
-        try:
-            # Try various date formats
-            for fmt in ['%Y-%m-%d', '%d/%m/%Y', '%d.%m.%Y', '%Y%m%d']:
-                try:
-                    dt = datetime.strptime(date_str.split('T')[0], fmt)
-                    return dt.strftime('%Y-%m-%d')
-                except ValueError:
-                    continue
-            # If no format matches, return as-is
-            return date_str.split('T')[0]
-        except Exception:
-            return None
-
-    def _get_mock_votes(self, session_number: str) -> List[Dict[str, Any]]:
-        """
-        Generate mock vote data for testing.
-
-        Args:
-            session_number: Session identifier
-
-        Returns:
-            List of mock vote records
-        """
-        self.log_warning("Using mock vote data for testing")
-
-        # Create a few mock votes
-        mock_votes = []
-
-        # Sample Polish MEP names for testing
-        polish_meps = [
-            "Jan KOWALSKI", "Anna NOWAK", "Piotr WIŚNIEWSKI",
-            "Maria KOWALCZYK", "Andrzej KAMIŃSKI"
-        ]
-
-        vote_choices = ['FOR', 'AGAINST', 'ABSTAIN', 'FOR', 'FOR']
-
-        for vote_num in range(1, 3):  # Just 2 votes for testing
-            for i, mep_name in enumerate(polish_meps):
-                vote_record = {
-                    'session_number': session_number,
-                    'vote_number': f"Vote {vote_num}",
-                    'title': f"Mock vote {vote_num} - Test amendment",
-                    'date': '2024-11-12',
-                    'result': 'ADOPTED' if vote_num == 1 else 'REJECTED',
-                    'total_for': 420,
-                    'total_against': 180,
-                    'total_abstain': 50,
-                    'document_reference': f"A10-{vote_num}/2024",
-                    'mep_name': mep_name,
-                    'vote_choice': vote_choices[i]
-                }
-                mock_votes.append(vote_record)
-                self.stats['items_scraped'] += 1
-
-        return mock_votes
 
     def validate(self, data: List[Dict]) -> List[Dict]:
         """
@@ -564,10 +722,18 @@ class VotesScraper(BaseScraper):
 
         for vote in data:
             # Required fields
-            required = ['session_number', 'vote_number', 'vote_choice']
+            required = ['vote_number', 'vote_choice', 'person_id']
             if not all(vote.get(field) for field in required):
                 self.log_warning(
                     f"Missing required fields in vote: {vote.get('vote_number')}"
+                )
+                self.stats['items_invalid'] += 1
+                continue
+
+            # Validate person_id
+            if not vote.get('person_id') or vote['person_id'] == 0:
+                self.log_warning(
+                    f"Invalid person_id in vote: {vote.get('vote_number')}"
                 )
                 self.stats['items_invalid'] += 1
                 continue
@@ -592,15 +758,6 @@ class VotesScraper(BaseScraper):
                     self.log_warning(f"Invalid date format: {vote['date']}")
                     vote['date'] = None
 
-            # At least one of mep_ep_id or mep_name should be present
-            if not vote.get('mep_ep_id') and not vote.get('mep_name'):
-                self.log_warning(
-                    f"Vote record has neither mep_ep_id nor mep_name: "
-                    f"{vote.get('vote_number')}"
-                )
-                self.stats['items_invalid'] += 1
-                continue
-
             valid_votes.append(vote)
             self.stats['items_valid'] += 1
 
@@ -610,44 +767,45 @@ class VotesScraper(BaseScraper):
 
 # Example usage
 if __name__ == "__main__":
-    import os
     from dotenv import load_dotenv
 
     load_dotenv()
 
+    # Basic usage (no document enrichment)
     with VotesScraper() as scraper:
-        # Scrape votes for a session
-        session_number = "2024-11-I"
-        votes = scraper.scrape(session_number=session_number)
-
-        # Validate
+        meeting_id = "MTG-PL-2025-12-17"
+        votes = scraper.scrape(meeting_id=meeting_id)
         valid_votes = scraper.validate(votes)
-
-        # Print summary
         scraper.print_summary()
 
-        # Show sample
         if valid_votes:
             print(f"\nTotal vote records: {len(valid_votes)}")
             print("\nSample vote record:")
-            print(valid_votes[0])
+            import json
+            print(json.dumps(valid_votes[0], default=str, ensure_ascii=False, indent=2))
 
             # Group by vote number to see unique votes
-            unique_votes = {}
+            unique_votes: Dict[str, Dict] = {}
             for vote in valid_votes:
                 vote_num = vote['vote_number']
                 if vote_num not in unique_votes:
                     unique_votes[vote_num] = {
                         'title': vote['title'],
                         'result': vote['result'],
-                        'meps': []
+                        'document_reference': vote.get('document_reference'),
+                        'context_ai': vote.get('context_ai'),
+                        'choices': {'FOR': 0, 'AGAINST': 0, 'ABSTAIN': 0}
                     }
-                unique_votes[vote_num]['meps'].append(
-                    f"{vote.get('mep_name', 'Unknown')}: {vote['vote_choice']}"
-                )
+                choice = vote['vote_choice']
+                if choice in unique_votes[vote_num]['choices']:
+                    unique_votes[vote_num]['choices'][choice] += 1
 
             print(f"\nUnique votes found: {len(unique_votes)}")
-            for vote_num, info in list(unique_votes.items())[:2]:
-                print(f"\n{vote_num}: {info['title']}")
-                print(f"Result: {info['result']}")
-                print(f"MEPs voted: {len(info['meps'])}")
+            for vote_num, info in list(unique_votes.items())[:5]:
+                print(f"\n  {vote_num}: {info['title'][:80]}...")
+                print(f"  Result: {info['result']}")
+                print(f"  Doc ref: {info['document_reference']}")
+                print(f"  Context: {(info['context_ai'] or '')[:80]}")
+                print(f"  Votes: FOR={info['choices']['FOR']}, "
+                      f"AGAINST={info['choices']['AGAINST']}, "
+                      f"ABSTAIN={info['choices']['ABSTAIN']}")
