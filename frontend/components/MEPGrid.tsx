@@ -1,0 +1,135 @@
+'use client'
+import { useMemo } from 'react'
+import { MEPWithStats } from '@/lib/types'
+import { MEPCard } from './MEPCard'
+import { Input } from './ui/input'
+import { Button } from './ui/button'
+import { useFilterMEP } from '@/hooks/useFilterMEP'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from './ui/select'
+
+type MEPSGridProps = {
+  meps?: MEPWithStats[]
+}
+
+export const MEPGrid = ({ meps }: MEPSGridProps) => {
+  const {
+    filteredList,
+    handleSearchChange,
+    filters,
+    handleNationalPartyChange,
+    handleEpGroupChange,
+    hasActiveFilters,
+    clearFilters,
+    sortBy,
+    handleSortBy,
+  } = useFilterMEP({ initialList: meps })
+
+  const nationalParties = useMemo(
+    () =>
+      meps
+        ?.reduce((acc, mep) => {
+          if (mep.nationalParty && !acc.includes(mep.nationalParty)) {
+            acc.push(mep.nationalParty)
+          }
+          return acc
+        }, [] as string[])
+        .sort() ?? [],
+    [meps],
+  )
+
+  const epGroups = useMemo(
+    () =>
+      meps
+        ?.reduce((acc, mep) => {
+          if (mep.epGroup && !acc.includes(mep.epGroup)) {
+            acc.push(mep.epGroup)
+          }
+          return acc
+        }, [] as string[])
+        .sort() ?? [],
+    [meps],
+  )
+
+  return (
+    <>
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
+        <Input
+          placeholder="Szukaj posła..."
+          className="sm:max-w-xs"
+          type="search"
+          value={filters.search}
+          onChange={handleSearchChange}
+        />
+        <Select
+          value={filters.nationalParty || '__all__'}
+          onValueChange={handleNationalPartyChange}
+        >
+          <SelectTrigger className="sm:max-w-50">
+            <SelectValue placeholder="Polska partia" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="__all__">Wszystkie partie</SelectItem>
+            {nationalParties.map((party) => (
+              <SelectItem key={party} value={party}>
+                {party}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select
+          value={filters.epGroup || '__all__'}
+          onValueChange={handleEpGroupChange}
+        >
+          <SelectTrigger className="sm:max-w-50">
+            <SelectValue placeholder="Eurogrupa" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="__all__">Wszystkie grupy</SelectItem>
+            {epGroups.map((group) => (
+              <SelectItem key={group} value={group}>
+                {group}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select value={sortBy} onValueChange={handleSortBy}>
+          <SelectTrigger className="sm:max-w-50">
+            <SelectValue placeholder="Sortuj według" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="ranking">Ranking</SelectItem>
+            <SelectItem value="attendance">Frekwencja</SelectItem>
+            <SelectItem value="name">Nazwisko</SelectItem>
+          </SelectContent>
+        </Select>
+        {hasActiveFilters && (
+          <Button variant="outline" size="sm" onClick={clearFilters}>
+            Wyczyść filtry
+          </Button>
+        )}
+      </div>
+
+      <p className="mb-4 text-sm text-muted-foreground">
+        Wyświetlono {filteredList.length} z {meps?.length ?? 0} posłów
+      </p>
+
+      {filteredList.length === 0 ? (
+        <div className="rounded-lg border-2 border-dashed border-gray-300 p-12 text-center">
+          <p className="text-gray-600">Brak posłów spełniających kryteria</p>
+        </div>
+      ) : (
+        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          {filteredList.map((mep) => (
+            <MEPCard key={mep.id} mep={mep} />
+          ))}
+        </div>
+      )}
+    </>
+  )
+}
