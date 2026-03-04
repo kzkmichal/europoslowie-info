@@ -65,6 +65,19 @@ export type MEPInfo = {
   epGroup: string | null
 }
 
+export type MEPSessionSummary = {
+  id: number
+  sessionNumber: string
+  startDate: Date
+  endDate: Date
+  location: string | null
+  year: number
+  votesFor: number
+  votesAgainst: number
+  votesAbstain: number
+  votesAbsent: number
+}
+
 /**
  * Vote with MEP info
  */

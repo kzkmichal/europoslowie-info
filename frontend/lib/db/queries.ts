@@ -7,7 +7,18 @@ import {
   votingSessions,
 } from './schema'
 import { eq, desc, and, sql, count, max, min, asc } from 'drizzle-orm'
-import type { MEPWithStats, MEPProfile, VoteDetails, MEPVoteHistory, VotesList, VoteDetailsById, RelatedVote, EpGroupRow } from '../types'
+import type {
+  MEPWithStats,
+  MEPProfile,
+  VoteDetails,
+  MEPVoteHistory,
+  VotesList,
+  VoteDetailsById,
+  RelatedVote,
+  EpGroupRow,
+  MEPSessionSummary,
+  MEPVote,
+} from '../types'
 import type { Vote } from './schema'
 
 export async function getAllMEPsWithStats(): Promise<MEPWithStats[]> {
@@ -38,7 +49,7 @@ export async function getAllMEPsWithStats(): Promise<MEPWithStats[]> {
         latestStats: latestStats[0] || null,
         topVote: topVote[0] || null,
       }
-    })
+    }),
   )
 
   return mepsWithStats
@@ -69,8 +80,8 @@ export async function getMepBySlug(slug: string): Promise<MEPProfile | null> {
     .where(
       and(
         eq(committeeMemberships.mepId, mep[0].id),
-        eq(committeeMemberships.isCurrent, true)
-      )
+        eq(committeeMemberships.isCurrent, true),
+      ),
     )
 
   return {
@@ -141,7 +152,7 @@ export async function getVoteById(id: number): Promise<VoteDetails | null> {
 }
 
 export async function getVoteDetails(
-  voteNumber: string
+  voteNumber: string,
 ): Promise<VoteDetailsById | null> {
   const voteRow = await db
     .select({
@@ -191,12 +202,7 @@ export async function getVoteDetails(
     })
     .from(votes)
     .innerJoin(meps, eq(votes.mepId, meps.id))
-    .where(
-      and(
-        eq(votes.voteNumber, voteNumber),
-        eq(meps.isActive, true)
-      )
-    )
+    .where(and(eq(votes.voteNumber, voteNumber), eq(meps.isActive, true)))
     .orderBy(votes.voteChoice, meps.nationalParty, meps.lastName)
 
   const groupedVotes = {
@@ -222,7 +228,7 @@ export async function getVoteDetails(
 
 export async function getTopVotesForMonth(
   year: number,
-  month: number
+  month: number,
 ): Promise<Vote[]> {
   const startDate = `${year}-${String(month).padStart(2, '0')}-01`
   const endDate = new Date(year, month, 0).toISOString().split('T')[0]
@@ -234,8 +240,8 @@ export async function getTopVotesForMonth(
       and(
         eq(votes.starsPoland, 5),
         sql`${votes.date} >= ${startDate}::date`,
-        sql`${votes.date} <= ${endDate}::date`
-      )
+        sql`${votes.date} <= ${endDate}::date`,
+      ),
     )
     .orderBy(desc(votes.date))
 
@@ -248,7 +254,7 @@ export async function getMepVotes(
     page?: number
     limit?: number
     voteChoice?: 'FOR' | 'AGAINST' | 'ABSTAIN' | 'ABSENT'
-  } = {}
+  } = {},
 ): Promise<MEPVoteHistory | null> {
   const { page = 1, limit = 20, voteChoice } = options
   const offset = (page - 1) * limit
@@ -313,7 +319,7 @@ export async function getVotesList(
     limit?: number
     year?: number
     month?: number
-  } = {}
+  } = {},
 ): Promise<VotesList> {
   const { page = 1, limit = 20, year, month } = options
   const offset = (page - 1) * limit
@@ -387,7 +393,7 @@ export async function getCurrentMonthTopVotes(): Promise<Vote[]> {
 }
 
 export async function getEpGroupBreakdown(
-  voteNumber: string
+  voteNumber: string,
 ): Promise<EpGroupRow[]> {
   const rows = await db
     .select({
@@ -404,7 +410,14 @@ export async function getEpGroupBreakdown(
   for (const row of rows) {
     const group = row.epGroup?.trim() || 'Niezrzeszeni'
     if (!grouped[group]) {
-      grouped[group] = { epGroup: group, for: 0, against: 0, abstain: 0, absent: 0, total: 0 }
+      grouped[group] = {
+        epGroup: group,
+        for: 0,
+        against: 0,
+        abstain: 0,
+        absent: 0,
+        total: 0,
+      }
     }
     const r = grouped[group]
     const n = Number(row.cnt)
@@ -419,7 +432,7 @@ export async function getEpGroupBreakdown(
 }
 
 export async function getRelatedVotes(
-  voteNumber: string
+  voteNumber: string,
 ): Promise<RelatedVote[]> {
   const voteRow = await db
     .select({ title: votes.title, sessionId: votes.sessionId })
@@ -449,7 +462,9 @@ export async function getRelatedVotes(
   if (related.length <= 1) return []
 
   return related
-    .filter((r): r is typeof r & { voteNumber: string } => r.voteNumber !== null)
+    .filter(
+      (r): r is typeof r & { voteNumber: string } => r.voteNumber !== null,
+    )
     .map((r) => ({
       voteNumber: r.voteNumber,
       decLabel: r.decLabel ?? null,
@@ -459,4 +474,97 @@ export async function getRelatedVotes(
       votesAbstain: r.votesAbstain ?? null,
       isMain: r.isMain,
     }))
+}
+
+export async function getMepSessionList(
+  slug: string,
+): Promise<MEPSessionSummary[]> {
+  const mep = await db
+    .select({ id: meps.id })
+    .from(meps)
+    .where(eq(meps.slug, slug))
+    .limit(1)
+
+  if (!mep[0]) return []
+
+  const mepId = mep[0].id
+
+  const sessions = await db
+    .select({
+      sessionId: votingSessions.id,
+      sessionNumber: votingSessions.sessionNumber,
+      startDate: votingSessions.startDate,
+      year: sql<number>`EXTRACT(YEAR FROM ${votingSessions.startDate})`,
+      endDate: votingSessions.endDate,
+      location: votingSessions.location,
+      votesFor: sql<number>`SUM(CASE WHEN ${votes.voteChoice} = 'FOR' THEN 1 ELSE 0 END)`,
+      votesAgainst: sql<number>`SUM(CASE WHEN ${votes.voteChoice} = 'AGAINST' THEN 1 ELSE 0 END)`,
+      votesAbstain: sql<number>`SUM(CASE WHEN ${votes.voteChoice} = 'ABSTAIN' THEN 1 ELSE 0 END)`,
+      votesAbsent: sql<number>`SUM(CASE WHEN ${votes.voteChoice} = 'ABSENT' THEN 1 ELSE 0 END)`,
+    })
+    .from(votes)
+    .innerJoin(votingSessions, eq(votes.sessionId, votingSessions.id))
+    .where(and(eq(votes.mepId, mepId), eq(votes.isMain, true)))
+    .groupBy(
+      votingSessions.id,
+      votingSessions.sessionNumber,
+      votingSessions.startDate,
+      votingSessions.endDate,
+      votingSessions.location,
+      sql<number>`EXTRACT(YEAR FROM ${votingSessions.startDate})`,
+    )
+    .orderBy(desc(votingSessions.startDate))
+
+  return sessions.map((s) => ({
+    ...s,
+    id: s.sessionId ?? 0,
+  }))
+}
+
+export async function getMepVotesBySession(
+  slug: string,
+  sessionId: number,
+): Promise<MEPVote[]> {
+  const mep = await db
+    .select({ id: meps.id })
+    .from(meps)
+    .where(eq(meps.slug, slug))
+    .limit(1)
+
+  if (!mep[0]) return []
+
+  const mepId = mep[0].id
+
+  const votesList = await db
+    .select({
+      id: votes.id,
+      voteNumber: votes.voteNumber,
+      title: votes.title,
+      titleEn: votes.titleEn,
+      date: votes.date,
+      voteChoice: votes.voteChoice,
+      result: votes.result,
+      votesFor: votes.votesFor,
+      votesAgainst: votes.votesAgainst,
+      votesAbstain: votes.votesAbstain,
+      starsPoland: votes.starsPoland,
+      sessionId: votes.sessionId,
+    })
+    .from(votes)
+    .where(
+      and(
+        eq(votes.mepId, mepId),
+        eq(votes.isMain, true),
+        eq(votes.sessionId, sessionId),
+      ),
+    )
+    .orderBy(asc(votes.voteNumber))
+
+  return votesList.map((v) => ({
+    ...v,
+    id: v.id ?? 0,
+    title: v.title ?? '',
+    titleEn: v.titleEn ?? '',
+    date: v.date ?? new Date(),
+  }))
 }
