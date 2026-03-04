@@ -1,6 +1,6 @@
 # Project Progress
 
-Last updated: 2026-03-02
+Last updated: 2026-03-04
 
 ## ✅ Completed
 
@@ -58,13 +58,20 @@ Last updated: 2026-03-02
 - [x] `getCurrentMonthTopVotes()` — Top votes page
 - [x] `getRelatedVotes(voteNumber)` — Related votes grouped by (title, session_id)
 - [x] `getEpGroupBreakdown(voteNumber)` — Polish MEPs breakdown by EP group
+- [x] `getMepSessionList(slug)` — lista sesji posła z mini-statystykami (tylko `is_main`)
+- [x] `getMepVotesBySession(slug, sessionId)` — głosowania posła per sesja (tylko `is_main`)
 
 #### Pages
 - [x] Homepage (`/`) — MEP grid with search/filter/sort
-- [x] MEP profile page (`/poslowie/[slug]`) — stats, votes, committees
+- [x] MEP profile page (`/poslowie/[slug]`) — stats, nawigacja po sesjach, historia głosowań
 - [x] Vote details page (`/glosowania/[voteNumber]`) — full breakdown
 - [x] Top votes page (`/top-glosowania`)
 - [x] Static pages (Metodologia, O Projekcie)
+
+#### Components — MEP profile page
+- [x] `VoteSessionNav` — nawigacja po sesjach: Select z historią + Poprzednia/Następna + info bar z mini-statystykami sesji
+- [x] `VoteRow` — pojedyncze głosowanie w historii (badge koloru, tytuł, link do szczegółów)
+- [x] `StatsTable` — tabela statystyk miesięcznych
 
 #### Components — Vote details page
 - [x] `AllMEPsVotingChart` — EP-wide vote totals (stacked bar: Za/Przeciw/Wstrz.)
@@ -90,6 +97,8 @@ Last updated: 2026-03-02
 - [x] `MEPWithStats`, `MEPProfile`, `MEPInfo`, `VoteWithMEP`, `VoteDetails`
 - [x] `RelatedVote`, `EpGroupRow` (nowe typy)
 - [x] `VoteDetailsById` — rozszerzony o `decLabel`, `isMain`
+- [x] `MEPSessionSummary` — sesja z mini-statystykami głosowań posła
+- [x] `MEPVote` — rozszerzony o `sessionId`
 
 ## 🚧 In Progress
 
@@ -121,23 +130,26 @@ Last updated: 2026-03-02
 ## 📊 Statistics
 
 - **Database Tables:** 7/7 ✓ + migration 003 (dec_label)
-- **Active MEPs in DB:** 53 ✓ (dane rzeczywiste, test records usunięte)
+- **Active MEPs in DB:** 53 ✓ (dane rzeczywiste, test records usunięte, Kierwiński inactive)
 - **Scrapers:** 3/3 (100%) ✓
   - MEPs scraper ✓
   - Voting sessions scraper ✓
   - Votes scraper ✓
+- **Processors:** 1/1 ✓
+  - `calculate_stats.py` — monthly_stats z is_main głosowań, ranking wśród Polaków ✓
 - **Frontend MVP:** 100% complete ✓
   - Pages: 6/6
-  - Components: 15+
+  - Components: 18+
   - Type System: Complete
-- **Query Functions:** 6/6 (100%) ✓
+- **Query Functions:** 8/8 (100%) ✓
 - **UI Library:** shadcn/ui ✓ (Input, Select, Button, Badge)
 
 ## 🎯 Next Steps
 
 1. **Strona /glosowania** — filtrowanie server-side (data, wynik, tagi), paginacja, URL params (`useSearchParams`)
-2. **Implementacja AI processing** — integracja Claude API dla kontekstu głosowań i scoringu
-3. **Deploy MVP** — Vercel + Supabase
+2. **Zdjęcia posłów** — `mep.photoUrl` jest w bazie, placeholder zastąpić `<Image>`
+3. **Implementacja AI processing** — integracja Claude API dla kontekstu głosowań i scoringu
+4. **Deploy MVP** — Vercel + Supabase
 
 ## 📝 Notes
 

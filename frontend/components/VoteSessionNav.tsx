@@ -45,7 +45,7 @@ const VoteSessionNav = ({
     return startStr === endStr ? startStr : `${startStr} – ${endStr}`
   }
 
-  const currentIndex = currentSession.id
+  const currentIndex = sessions.findIndex((s) => s.id === currentSession.id)
   const prevSession = sessions[currentIndex - 1]
   const nextSession = sessions[currentIndex + 1]
 
