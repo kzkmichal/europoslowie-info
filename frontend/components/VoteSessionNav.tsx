@@ -65,7 +65,7 @@ const VoteSessionNav = ({
             router.push(`/poslowie/${slug}?session=${value}`)
           }
         >
-          <SelectTrigger className="w-auto min-w-[240px]">
+          <SelectTrigger className="w-auto min-w-60">
             <SelectValue placeholder="Wybierz sesję" />
           </SelectTrigger>
           <SelectContent>
