@@ -4,7 +4,7 @@ import { cn } from '@/lib/utils'
 
 const navLinkStyles = cn(
   'text-sm font-medium text-gray-700',
-  'transition-colors hover:text-blue-600'
+  'transition-colors hover:text-blue-600',
 )
 
 export function Header() {
@@ -19,8 +19,8 @@ export function Header() {
             <Link href="/" className={navLinkStyles}>
               Posłowie
             </Link>
-            <Link href="/top-glosowania" className={navLinkStyles}>
-              Top głosowania
+            <Link href="/glosowania" className={navLinkStyles}>
+              Głosowania
             </Link>
             <Link href="/metodologia" className={navLinkStyles}>
               Metodologia

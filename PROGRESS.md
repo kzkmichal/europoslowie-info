@@ -1,6 +1,6 @@
 # Project Progress
 
-Last updated: 2026-03-04
+Last updated: 2026-03-07
 
 ## ✅ Completed
 
@@ -60,10 +60,12 @@ Last updated: 2026-03-04
 - [x] `getEpGroupBreakdown(voteNumber)` — Polish MEPs breakdown by EP group
 - [x] `getMepSessionList(slug)` — lista sesji posła z mini-statystykami (tylko `is_main`)
 - [x] `getMepVotesBySession(slug, sessionId)` — głosowania posła per sesja (tylko `is_main`)
+- [x] `getVotesList(options)` — strona listingowa głosowań (filtry: year/month/result, paginacja page/limit)
 
 #### Pages
 - [x] Homepage (`/`) — MEP grid with search/filter/sort
 - [x] MEP profile page (`/poslowie/[slug]`) — stats, nawigacja po sesjach, historia głosowań
+- [x] Votes listing page (`/glosowania`) — server-side filtering (year/month/result), paginacja, URL params, grupowanie po dacie
 - [x] Vote details page (`/glosowania/[voteNumber]`) — full breakdown
 - [x] Top votes page (`/top-glosowania`)
 - [x] Static pages (Metodologia, O Projekcie)
@@ -72,6 +74,9 @@ Last updated: 2026-03-04
 - [x] `VoteSessionNav` — nawigacja po sesjach: Select z historią + Poprzednia/Następna + info bar z mini-statystykami sesji
 - [x] `VoteRow` — pojedyncze głosowanie w historii (badge koloru, tytuł, link do szczegółów)
 - [x] `StatsTable` — tabela statystyk miesięcznych
+
+#### Components — Votes listing page
+- [x] `VotesFilter` (client component) — filtry server-side: rok/miesiąc/wynik, URL params, reset paginacji przy zmianie filtra
 
 #### Components — Vote details page
 - [x] `AllMEPsVotingChart` — EP-wide vote totals (stacked bar: Za/Przeciw/Wstrz.)
@@ -138,18 +143,16 @@ Last updated: 2026-03-04
 - **Processors:** 1/1 ✓
   - `calculate_stats.py` — monthly_stats z is_main głosowań, ranking wśród Polaków ✓
 - **Frontend MVP:** 100% complete ✓
-  - Pages: 6/6
-  - Components: 18+
+  - Pages: 7/7
+  - Components: 19+
   - Type System: Complete
-- **Query Functions:** 8/8 (100%) ✓
+- **Query Functions:** 9/9 (100%) ✓
 - **UI Library:** shadcn/ui ✓ (Input, Select, Button, Badge)
 
 ## 🎯 Next Steps
 
-1. **Strona /glosowania** — filtrowanie server-side (data, wynik, tagi), paginacja, URL params (`useSearchParams`)
-2. **Zdjęcia posłów** — `mep.photoUrl` jest w bazie, placeholder zastąpić `<Image>`
-3. **Implementacja AI processing** — integracja Claude API dla kontekstu głosowań i scoringu
-4. **Deploy MVP** — Vercel + Supabase
+1. **Implementacja AI processing** — integracja Claude API dla kontekstu głosowań i scoringu
+2. **Deploy MVP** — Vercel + Supabase
 
 ## 📝 Notes
 

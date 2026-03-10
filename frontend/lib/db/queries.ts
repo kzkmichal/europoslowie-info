@@ -319,9 +319,10 @@ export async function getVotesList(
     limit?: number
     year?: number
     month?: number
+    result?: 'ADOPTED' | 'REJECTED'
   } = {},
 ): Promise<VotesList> {
-  const { page = 1, limit = 20, year, month } = options
+  const { page = 1, limit = 20, year, month, result } = options
   const offset = (page - 1) * limit
 
   const conditions = [eq(votes.isMain, true)]
@@ -332,6 +333,10 @@ export async function getVotesList(
     conditions.push(sql`${votes.date} <= ${endDate}::date`)
   } else if (year) {
     conditions.push(sql`EXTRACT(YEAR FROM ${votes.date}) = ${year}`)
+  }
+
+  if (result) {
+    conditions.push(eq(votes.result, result))
   }
 
   const whereClause = and(...conditions)
