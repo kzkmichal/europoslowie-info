@@ -15,6 +15,10 @@ Usage:
     # Tier 1 + Tier 2 — slow, ~2s per unique doc (~10-20 min for full DB)
     python scripts/populate_vote_sources.py --with-procedures
 
+    # Tier 2 only — add PROCEDURE_OEIL for votes that have REPORT but no
+    # PROCEDURE_OEIL yet (use after Tier 1 was already run for all votes)
+    python scripts/populate_vote_sources.py --procedures-only
+
     # Preview without inserting
     python scripts/populate_vote_sources.py --dry-run
 
@@ -102,6 +106,61 @@ def get_already_populated_vote_numbers(db_session: Session) -> Set[str]:
     return {row.vote_number for row in rows}
 
 
+def get_votes_needing_procedure(
+    db_session: Session,
+    vote_number_filter: Optional[str] = None,
+) -> List[Dict[str, Any]]:
+    """
+    Return votes that have a REPORT source but no PROCEDURE_OEIL source yet.
+
+    Used by --procedures-only mode to add only missing PROCEDURE_OEIL links
+    when Tier 1 has already been run for all votes.
+
+    Returns rows with vote_number and dec_label (needed to derive doc_id).
+    """
+    if vote_number_filter:
+        sql = text("""
+            SELECT DISTINCT ON (v.vote_number)
+                v.vote_number,
+                v.dec_label
+            FROM vote_sources vs
+            JOIN votes v ON v.vote_number = vs.vote_number
+            WHERE vs.source_type = 'REPORT'
+              AND v.vote_number = :vote_number
+              AND vs.vote_number NOT IN (
+                  SELECT DISTINCT vote_number
+                  FROM vote_sources
+                  WHERE source_type = 'PROCEDURE_OEIL'
+              )
+            ORDER BY v.vote_number, v.id
+        """)
+        rows = db_session.execute(sql, {"vote_number": vote_number_filter}).fetchall()
+    else:
+        sql = text("""
+            SELECT DISTINCT ON (v.vote_number)
+                v.vote_number,
+                v.dec_label
+            FROM vote_sources vs
+            JOIN votes v ON v.vote_number = vs.vote_number
+            WHERE vs.source_type = 'REPORT'
+              AND vs.vote_number NOT IN (
+                  SELECT DISTINCT vote_number
+                  FROM vote_sources
+                  WHERE source_type = 'PROCEDURE_OEIL'
+              )
+            ORDER BY v.vote_number, v.id
+        """)
+        rows = db_session.execute(sql).fetchall()
+
+    return [
+        {
+            'vote_number': row.vote_number,
+            'dec_label':   row.dec_label,
+        }
+        for row in rows
+    ]
+
+
 def insert_sources(
     db_session: Session,
     sources: List[Dict[str, Any]],
@@ -144,6 +203,7 @@ def insert_sources(
 def run(
     db_url: str,
     with_procedures: bool = False,
+    procedures_only: bool = False,
     dry_run: bool = False,
     vote_number_filter: Optional[str] = None,
     force: bool = False,
@@ -156,12 +216,71 @@ def run(
     try:
         logger.info("=" * 70)
         logger.info("populate_vote_sources — starting")
-        logger.info(f"  with_procedures = {with_procedures}")
-        logger.info(f"  dry_run         = {dry_run}")
-        logger.info(f"  force           = {force}")
+        logger.info(f"  with_procedures  = {with_procedures}")
+        logger.info(f"  procedures_only  = {procedures_only}")
+        logger.info(f"  dry_run          = {dry_run}")
+        logger.info(f"  force            = {force}")
         if vote_number_filter:
-            logger.info(f"  vote_number     = {vote_number_filter}")
+            logger.info(f"  vote_number      = {vote_number_filter}")
         logger.info("=" * 70)
+
+        # ── --procedures-only mode: add missing PROCEDURE_OEIL sources ────────
+        # Used when Tier 1 was already run for all votes and only Tier 2 is
+        # needed. Finds votes with REPORT but no PROCEDURE_OEIL, re-derives
+        # doc_id from dec_label, fetches API, inserts only PROCEDURE_OEIL rows.
+        if procedures_only:
+            candidates = get_votes_needing_procedure(db_session, vote_number_filter)
+            logger.info(
+                f"Found {len(candidates)} votes with REPORT but no PROCEDURE_OEIL"
+            )
+
+            if not candidates:
+                logger.info("Nothing to do.")
+                return
+
+            total_inserted = 0
+            proc_hits = 0
+            proc_misses = 0
+
+            with SourcesScraper() as scraper:
+                for i, vote in enumerate(candidates, 1):
+                    vote_number = vote['vote_number']
+                    dec_label   = vote['dec_label']
+
+                    if i % 50 == 0 or i == len(candidates):
+                        logger.info(f"Processing {i}/{len(candidates)}: {vote_number}")
+
+                    # Re-derive doc_id from dec_label using scraper helpers
+                    doc_ref = scraper._extract_doc_ref(dec_label) if dec_label else None
+                    doc_id  = scraper._doc_ref_to_doc_id(doc_ref) if doc_ref else None
+
+                    if not doc_id:
+                        proc_misses += 1
+                        continue
+
+                    proc_src = scraper.fetch_procedure_source(
+                        vote_number=vote_number,
+                        doc_id=doc_id,
+                    )
+                    if proc_src:
+                        n = insert_sources(db_session, [proc_src], dry_run)
+                        total_inserted += n
+                        proc_hits += 1
+                    else:
+                        proc_misses += 1
+
+            logger.info("=" * 70)
+            logger.info("populate_vote_sources — done (procedures-only)")
+            logger.info(f"  Candidates:       {len(candidates)}")
+            logger.info(f"  OEIL inserted:    {total_inserted}")
+            logger.info(f"  Procedure hits:   {proc_hits}")
+            logger.info(f"  Procedure misses: {proc_misses}")
+            if dry_run:
+                logger.info("  (dry-run — nothing was actually inserted)")
+            logger.info("=" * 70)
+            return
+
+        # ── Normal Tier 1 (+ optional Tier 2) mode ───────────────────────────
 
         # 1. Load votes to process
         votes = get_votes_to_process(db_session, vote_number_filter)
@@ -247,6 +366,14 @@ def main():
         help='Also fetch PROCEDURE_OEIL via EP API (slower, adds ~2s per vote)',
     )
     parser.add_argument(
+        '--procedures-only',
+        action='store_true',
+        help=(
+            'Fetch PROCEDURE_OEIL only for votes that already have a REPORT '
+            'source but no PROCEDURE_OEIL yet. Use when Tier 1 was already run.'
+        ),
+    )
+    parser.add_argument(
         '--dry-run',
         action='store_true',
         help='Print sources without inserting into DB',
@@ -274,6 +401,7 @@ def main():
     run(
         db_url=db_url,
         with_procedures=args.with_procedures,
+        procedures_only=args.procedures_only,
         dry_run=args.dry_run,
         vote_number_filter=args.vote_number,
         force=args.force,
