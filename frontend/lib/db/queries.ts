@@ -5,6 +5,7 @@ import {
   monthlyStats,
   votes,
   votingSessions,
+  voteSources,
 } from './schema'
 import { eq, desc, and, sql, count, max, min, asc } from 'drizzle-orm'
 import type {
@@ -18,6 +19,7 @@ import type {
   EpGroupRow,
   MEPSessionSummary,
   MEPVote,
+  VoteSource,
 } from '../types'
 import type { Vote } from './schema'
 
@@ -571,5 +573,39 @@ export async function getMepVotesBySession(
     title: v.title ?? '',
     titleEn: v.titleEn ?? '',
     date: v.date ?? new Date(),
+  }))
+}
+
+export async function getVoteSources(
+  voteNumber: string,
+): Promise<VoteSource[]> {
+  const rows = await db
+    .select({
+      id: voteSources.id,
+      voteNumber: voteSources.voteNumber,
+      url: voteSources.url,
+      name: voteSources.name,
+      sourceType: voteSources.sourceType,
+    })
+    .from(voteSources)
+    .where(eq(voteSources.voteNumber, voteNumber))
+    .orderBy(
+      sql`CASE ${voteSources.sourceType}
+        WHEN 'REPORT'         THEN 1
+        WHEN 'PROCEDURE_OEIL' THEN 2
+        WHEN 'PRESS_RELEASE'  THEN 3
+        WHEN 'VOT_XML'        THEN 4
+        WHEN 'RCV_XML'        THEN 5
+        ELSE 6
+      END`,
+    )
+
+  return rows.map((r) => ({
+    ...r,
+    id: r.id ?? 0,
+    voteNumber: r.voteNumber ?? voteNumber,
+    url: r.url ?? '',
+    name: r.name ?? '',
+    sourceType: r.sourceType ?? '',
   }))
 }

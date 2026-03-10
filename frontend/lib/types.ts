@@ -139,6 +139,18 @@ export type MEPVoteHistory = {
 }
 
 /**
+ * One official EP source link for a vote
+ * Used by: getVoteSources() -> /glosowania/[voteNumber] page
+ */
+export type VoteSource = {
+  id: number
+  voteNumber: string
+  url: string
+  name: string
+  sourceType: string
+}
+
+/**
  * Single entry in the related votes list
  * Used by: getRelatedVotes() -> /glosowania/[voteNumber] page
  */

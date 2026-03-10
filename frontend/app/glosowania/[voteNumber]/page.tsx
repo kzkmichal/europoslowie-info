@@ -2,6 +2,7 @@ import {
   getVoteDetails,
   getRelatedVotes,
   getEpGroupBreakdown,
+  getVoteSources,
 } from '@/lib/db/queries'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
@@ -11,6 +12,7 @@ import { AllMEPsVotingChart } from '@/components/AllMEPsVotingChart'
 import { EpGroupBreakdown } from '@/components/EpGroupBreakdown'
 import { RelatedVotesList } from '@/components/RelatedVotesList'
 import { MEPVoteList } from '@/components/MEPVoteList'
+import { VoteSources } from '@/components/VoteSources'
 import type { Metadata } from 'next'
 import { cn } from '@/lib/utils'
 
@@ -90,10 +92,11 @@ export async function generateMetadata({
 
 export default async function VoteDetailsPage({ params }: PageParams) {
   const { voteNumber } = await params
-  const [voteDetails, relatedVotes, epGroupRows] = await Promise.all([
+  const [voteDetails, relatedVotes, epGroupRows, voteSources] = await Promise.all([
     getVoteDetails(voteNumber),
     getRelatedVotes(voteNumber),
     getEpGroupBreakdown(voteNumber),
+    getVoteSources(voteNumber),
   ])
 
   if (!voteDetails) {
@@ -192,6 +195,7 @@ export default async function VoteDetailsPage({ params }: PageParams) {
             </div>
           )}
         </div>
+        <VoteSources sources={voteSources} />
         {relatedVotes.length > 0 && (
           <section className="mb-8">
             <h2 className="mb-4 text-2xl font-bold text-gray-900">
