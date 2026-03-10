@@ -1,11 +1,16 @@
-import { getMepBySlug, getMepVotes } from '@/lib/db/queries'
+import {
+  getMepBySlug,
+  getMepSessionList,
+  getMepVotesBySession,
+} from '@/lib/db/queries'
 import { notFound } from 'next/navigation'
 import { Container } from '@/components/Container'
 import { StatsTable } from '@/components/StatsTable'
 import { VoteCard } from '@/components/VoteCard'
 import { CommitteeList } from '@/components/CommitteeList'
-import { cn } from '@/lib/utils'
 import type { Metadata } from 'next'
+import VoteSessionNav from '@/components/VoteSessionNav'
+import { VoteRow } from '@/components/VoteRow'
 
 export type PageParams = {
   params: Promise<{ slug: string }>
@@ -40,18 +45,22 @@ export default async function MEPProfilePage({
   searchParams,
 }: PageParams) {
   const { slug } = await params
-  const { page } = await searchParams
-  const [mep, voteHistory] = await Promise.all([
+  const { session } = await searchParams
+  const sessionId = session ? parseInt(session as string, 10) : undefined
+
+  const [mep, sessionList] = await Promise.all([
     getMepBySlug(slug),
-    getMepVotes(slug, {
-      limit: 20,
-      page: page ? parseInt(page as string, 10) : 1,
-    }),
+    getMepSessionList(slug),
   ])
 
   if (!mep) {
     notFound()
   }
+
+  const currentSessionId = sessionId ?? sessionList[0]?.id
+  const votes = currentSessionId
+    ? await getMepVotesBySession(slug, currentSessionId)
+    : []
 
   const latestStats = mep.monthlyStats[0] || null
 
@@ -129,68 +138,18 @@ export default async function MEPProfilePage({
             </div>
           </section>
         )}
-        {voteHistory && voteHistory.votes.length > 0 && (
+        <VoteSessionNav
+          sessions={sessionList}
+          slug={slug}
+          currentSessionId={currentSessionId}
+        />
+        {votes && votes.length > 0 && (
           <section className="mb-8">
-            <div className="mb-4 flex items-baseline justify-between">
-              <h2 className="text-2xl font-bold text-gray-900">
-                Historia głosowań
-              </h2>
-              <span className="text-sm text-gray-500">
-                {voteHistory.total} głosowań łącznie
-              </span>
-            </div>
             <div className="space-y-2">
-              {voteHistory.votes.map((vote) => (
-                <div
-                  key={vote.id}
-                  className="flex items-center gap-4 rounded-lg border border-gray-200 bg-white p-3"
-                >
-                  <div
-                    className={cn(
-                      'w-24 shrink-0 rounded-full px-2 py-1 text-center text-xs font-semibold',
-                      vote.voteChoice === 'FOR' &&
-                        'bg-green-100 text-green-800',
-                      vote.voteChoice === 'AGAINST' &&
-                        'bg-red-100 text-red-800',
-                      vote.voteChoice === 'ABSTAIN' &&
-                        'bg-yellow-100 text-yellow-800',
-                      vote.voteChoice === 'ABSENT' &&
-                        'bg-gray-100 text-gray-600',
-                    )}
-                  >
-                    {vote.voteChoice === 'FOR' && 'Za'}
-                    {vote.voteChoice === 'AGAINST' && 'Przeciw'}
-                    {vote.voteChoice === 'ABSTAIN' && 'Wstrzymał się'}
-                    {vote.voteChoice === 'ABSENT' && 'Nieobecny'}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium text-gray-900">
-                      {vote.title}
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      {new Date(vote.date).toLocaleDateString('pl-PL', {
-                        year: 'numeric',
-                        month: 'long',
-                        day: 'numeric',
-                      })}
-                    </p>
-                  </div>
-                  {vote.voteNumber && (
-                    <a
-                      href={`/glosowania/${vote.voteNumber}`}
-                      className="shrink-0 text-xs text-blue-600 hover:underline"
-                    >
-                      Szczegóły →
-                    </a>
-                  )}
-                </div>
+              {votes.map((vote) => (
+                <VoteRow key={vote.id} vote={vote} />
               ))}
             </div>
-            {voteHistory.hasMore && (
-              <p className="mt-4 text-center text-sm text-gray-500">
-                Wyświetlono 20 z {voteHistory.total} głosowań
-              </p>
-            )}
           </section>
         )}
         {mep.committees.length > 0 && (
@@ -202,7 +161,7 @@ export default async function MEPProfilePage({
         {mep.monthlyStats.length === 0 &&
           mep.topVotes.length === 0 &&
           mep.committees.length === 0 &&
-          (!voteHistory || voteHistory.votes.length === 0) && (
+          (!votes || votes.length === 0) && (
             <div className="rounded-lg border-2 border-dashed border-gray-300 p-12 text-center">
               <p className="text-gray-600">
                 Brak danych statystycznych dla tego posła
