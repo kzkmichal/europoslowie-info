@@ -48,7 +48,9 @@ class HTTPClient:
     @retry(
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=4, max=10),
-        retry=retry_if_exception_type(requests.RequestException),
+        # Only retry on network errors (connection, timeout).
+        # HTTP 4xx/5xx are permanent — retrying them wastes time and spams logs.
+        retry=retry_if_exception_type((requests.ConnectionError, requests.Timeout)),
         reraise=True
     )
     def get(

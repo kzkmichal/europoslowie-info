@@ -32,6 +32,7 @@ Usage:
 import os
 import sys
 import argparse
+from collections import defaultdict
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Set
 
@@ -243,27 +244,40 @@ def run(
             proc_misses = 0
 
             with SourcesScraper() as scraper:
-                for i, vote in enumerate(candidates, 1):
-                    vote_number = vote['vote_number']
-                    dec_label   = vote['dec_label']
-
-                    if i % 50 == 0 or i == len(candidates):
-                        logger.info(f"Processing {i}/{len(candidates)}: {vote_number}")
-
-                    # Re-derive doc_id from dec_label using scraper helpers
+                # Group vote_numbers by doc_id so we make exactly 1 API call
+                # per unique document (multiple votes can share the same doc).
+                doc_id_to_votes: Dict[str, List[str]] = defaultdict(list)
+                for vote in candidates:
+                    dec_label = vote['dec_label']
                     doc_ref = scraper._extract_doc_ref(dec_label) if dec_label else None
                     doc_id  = scraper._doc_ref_to_doc_id(doc_ref) if doc_ref else None
-
-                    if not doc_id:
+                    if doc_id:
+                        doc_id_to_votes[doc_id].append(vote['vote_number'])
+                    else:
                         proc_misses += 1
-                        continue
 
+                unique_docs = list(doc_id_to_votes.items())
+                logger.info(
+                    f"Unique doc_ids to fetch: {len(unique_docs)} "
+                    f"(from {len(candidates)} candidates)"
+                )
+
+                for i, (doc_id, vote_numbers) in enumerate(unique_docs, 1):
+                    if i % 50 == 0 or i == len(unique_docs):
+                        logger.info(f"Processing {i}/{len(unique_docs)}: {doc_id}")
+
+                    # Fetch procedure using first vote_number as the record key;
+                    # then copy the result for every vote_number sharing this doc.
                     proc_src = scraper.fetch_procedure_source(
-                        vote_number=vote_number,
+                        vote_number=vote_numbers[0],
                         doc_id=doc_id,
                     )
                     if proc_src:
-                        n = insert_sources(db_session, [proc_src], dry_run)
+                        sources_to_insert = [
+                            {**proc_src, 'vote_number': vn}
+                            for vn in vote_numbers
+                        ]
+                        n = insert_sources(db_session, sources_to_insert, dry_run)
                         total_inserted += n
                         proc_hits += 1
                     else:
