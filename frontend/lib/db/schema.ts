@@ -145,6 +145,26 @@ export const speeches = pgTable('speeches', {
   topics: jsonb('topics').$type<string[]>(),
 })
 
+// Source type values for vote_sources table
+export const SOURCE_TYPES = [
+  'RCV_XML',        // Results of roll-call votes (XML) — EP doceo, generated from meeting_id
+  'VOT_XML',        // Results of votes (XML) — EP doceo, generated from meeting_id
+  'REPORT',         // Report or resolution (HTML) — EP doceo, derived from dec_label doc_ref
+  'PROCEDURE_OEIL', // Procedure file (Legislative Observatory) — requires extra EP API call
+  'PRESS_RELEASE',  // Press release — requires async RSS scraping pipeline
+] as const
+export type SourceType = (typeof SOURCE_TYPES)[number]
+
+export const voteSources = pgTable('vote_sources', {
+  id: serial('id').primaryKey(),
+  voteNumber: varchar('vote_number', { length: 50 }).notNull(),
+  url: text('url').notNull(),
+  name: varchar('name', { length: 200 }).notNull(),
+  sourceType: varchar('source_type', { length: 50 }).notNull().$type<SourceType>(),
+  accessedAt: timestamp('accessed_at'),
+  createdAt: timestamp('created_at').defaultNow(),
+})
+
 export const committeeMemberships = pgTable('committee_memberships', {
   id: serial('id').primaryKey(),
   mepId: integer('mep_id')
