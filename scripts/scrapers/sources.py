@@ -106,24 +106,40 @@ class SourcesScraper(BaseScraper):
         vote_number: str,
         dec_label: Optional[str],
         session_number: str,
+        document_reference: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
         """
         Build Tier 1 source records from data already in the DB.
 
         Creates RCV_XML and VOT_XML for every vote (derived from session date),
-        and a REPORT source when dec_label contains a parseable doc reference
-        that is NOT an RC-B (competing resolution) document — those don't have
-        standalone doceo HTML pages and would return 404.
+        and a REPORT source when a document reference is available.
+
+        REPORT source resolution (first match wins):
+          1. document_reference column — already in doceo doc_id format
+             (e.g. "A-10-2025-0195"), stored directly by the votes scraper.
+             Most reliable: covers votes whose dec_label is a translation
+             without a parseable doc ref (e.g. "Wstępne porozumienie - Popr. 27").
+          2. dec_label parsing — fallback for rows where document_reference
+             is NULL. Parses the doc_ref from the start of the dec_label string
+             and converts it to doceo format.
+
+        RC documents (dec_label starts with "RC-") are always skipped — they
+        are competing resolutions / joint motions with no standalone doceo page.
 
         The returned list may contain a special '_doc_id' key on REPORT entries
         (not stored in DB — used by populate_vote_sources.py to trigger Tier 2).
 
         Args:
-            vote_number:    Vote identifier, e.g. "185885"
-            dec_label:      Full DEC label from votes.dec_label, e.g.
-                            "A10-0244/2025 - Andrzej Buła - całość tekstu"
-            session_number: From voting_sessions.session_number, e.g.
-                            "MTG-PL-2025-12-17"
+            vote_number:         Vote identifier, e.g. "182807"
+            dec_label:           Full DEC label from votes.dec_label, e.g.
+                                 "A10-0244/2025 - Andrzej Buła - całość tekstu".
+                                 May be a language-specific translation with no
+                                 doc_ref (e.g. "Wstępne porozumienie - Popr. 27").
+            session_number:      From voting_sessions.session_number, e.g.
+                                 "MTG-PL-2025-12-17"
+            document_reference:  Pre-parsed doc_id from votes.document_reference,
+                                 already in doceo format (e.g. "A-10-2025-0195").
+                                 Takes precedence over dec_label parsing when set.
 
         Returns:
             List of source dicts with keys: vote_number, url, name, source_type
@@ -151,31 +167,31 @@ class SourcesScraper(BaseScraper):
                 f"Cannot extract date from session_number: {session_number}"
             )
 
-        # ── REPORT: derived from doc_ref in dec_label ────────────────────────
-        if dec_label:
-            doc_ref = self._extract_doc_ref(dec_label)
-            if doc_ref:
-                # RC-B documents are competing resolutions / joint motions for
-                # resolution. They are NOT published as standalone HTML pages on
-                # the EP doceo website (URL would 404), and the EP
-                # plenary-documents API also returns 404 for them. Skip both
-                # REPORT source and Tier 2 lookup for RC-B documents.
-                if doc_ref.startswith('RC-'):
-                    self.log_info(
-                        f"Skipping REPORT for RC doc_ref {doc_ref!r} "
-                        f"(competing resolution — no doceo HTML page)"
-                    )
-                else:
-                    doc_id = self._doc_ref_to_doc_id(doc_ref)
-                    if doc_id:
-                        url = f"{self.DOCEO_BASE}/{doc_id}_EN.html"
-                        sources.append({
-                            'vote_number': vote_number,
-                            'url':         url,
-                            'name':        SOURCE_NAMES['REPORT'],
-                            'source_type': 'REPORT',
-                            '_doc_id':     doc_id,   # temp key — used for Tier 2 lookup
-                        })
+        # ── REPORT: prefer document_reference, fall back to dec_label ────────
+        #
+        # RC documents (dec_label starts with "RC-") are competing resolutions
+        # (joint motions). They have no standalone doceo HTML pages, so skip.
+        #
+        # Detection: we check dec_label for the RC- prefix because
+        # document_reference for RC-B votes is stored as the underlying B
+        # document (e.g. "B-10-2026-0143") without the RC- prefix.
+        if dec_label and self._extract_doc_ref(dec_label, rc_check_only=True):
+            # dec_label starts with RC- → skip
+            self.log_info(
+                f"Skipping REPORT for vote {vote_number} "
+                f"(RC competing resolution: {dec_label[:40]!r})"
+            )
+        else:
+            doc_id = self._resolve_doc_id(document_reference, dec_label)
+            if doc_id:
+                url = f"{self.DOCEO_BASE}/{doc_id}_EN.html"
+                sources.append({
+                    'vote_number': vote_number,
+                    'url':         url,
+                    'name':        SOURCE_NAMES['REPORT'],
+                    'source_type': 'REPORT',
+                    '_doc_id':     doc_id,   # temp key — used for Tier 2 lookup
+                })
 
         return sources
 
@@ -454,13 +470,54 @@ class SourcesScraper(BaseScraper):
         match = re.search(r'(\d{4}-\d{2}-\d{2})$', session_number)
         return match.group(1) if match else None
 
-    def _extract_doc_ref(self, dec_label: str) -> Optional[str]:
+    def _resolve_doc_id(
+        self,
+        document_reference: Optional[str],
+        dec_label: Optional[str],
+    ) -> Optional[str]:
+        """
+        Resolve the doceo doc_id for a REPORT source.
+
+        Tries two sources in priority order:
+          1. document_reference — already stored in doceo format by the votes
+             scraper (e.g. "A-10-2025-0195"). Used directly as the doc_id.
+          2. dec_label parsing — fallback when document_reference is NULL.
+             Calls _extract_doc_ref() then _doc_ref_to_doc_id().
+
+        Returns:
+            doc_id string (e.g. "A-10-2025-0195"), or None if unresolvable.
+        """
+        # Priority 1: document_reference is already the correct doceo format
+        if document_reference:
+            return document_reference
+
+        # Priority 2: parse from dec_label
+        if dec_label:
+            doc_ref = self._extract_doc_ref(dec_label)
+            if doc_ref:
+                return self._doc_ref_to_doc_id(doc_ref)
+
+        return None
+
+    def _extract_doc_ref(
+        self,
+        dec_label: str,
+        rc_check_only: bool = False,
+    ) -> Optional[str]:
         """
         Extract document reference from the start of a dec_label string.
 
         dec_label format:
           "A10-0244/2025 - Andrzej Buła - całość tekstu"
           "B10-0558/2025 - Agnieszka Pomaska, ... - całość tekstu"
+          "RC-B10-0143/2026 - Projekt rezolucji (całość tekstu)"
+
+        Args:
+            dec_label:      Full DEC label string.
+            rc_check_only:  If True, return the candidate only when it starts
+                            with "RC-" (used to detect competing resolutions
+                            that should be skipped). Returns None for non-RC
+                            labels in this mode.
 
         Returns the first part before ' - ' if it looks like a doc ref
         (letters+digits+dash, then /year). Returns None for procedural labels
@@ -473,6 +530,8 @@ class SourcesScraper(BaseScraper):
 
         # Must start with capital letters and match doc ref pattern
         if re.match(r'^[A-Z][A-Z0-9\-]*\d{1,2}-\d+/\d{4}$', candidate):
+            if rc_check_only:
+                return candidate if candidate.startswith('RC-') else None
             return candidate
 
         return None

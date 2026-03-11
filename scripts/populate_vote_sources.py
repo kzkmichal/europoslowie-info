@@ -70,12 +70,17 @@ def get_votes_to_process(
 
     Returns only rows where vote_number is not NULL (procedural votes
     without a proper vote_number are skipped).
+
+    Includes document_reference (doceo doc_id stored by the votes scraper)
+    so build_sources_from_existing() can use it directly without parsing
+    dec_label (which may be a language-specific translation with no doc ref).
     """
     if vote_number_filter:
         sql = text("""
             SELECT DISTINCT ON (v.vote_number)
                 v.vote_number,
                 v.dec_label,
+                v.document_reference,
                 vs.session_number
             FROM votes v
             JOIN voting_sessions vs ON v.session_id = vs.id
@@ -91,6 +96,7 @@ def get_votes_to_process(
             SELECT DISTINCT ON (v.vote_number)
                 v.vote_number,
                 v.dec_label,
+                v.document_reference,
                 vs.session_number
             FROM votes v
             JOIN voting_sessions vs ON v.session_id = vs.id
@@ -101,9 +107,10 @@ def get_votes_to_process(
 
     return [
         {
-            'vote_number':    row.vote_number,
-            'dec_label':      row.dec_label,
-            'session_number': row.session_number,
+            'vote_number':        row.vote_number,
+            'dec_label':          row.dec_label,
+            'document_reference': row.document_reference,
+            'session_number':     row.session_number,
         }
         for row in rows
     ]
@@ -183,7 +190,9 @@ def get_votes_needing_procedure(
     Used by --procedures-only mode to add only missing PROCEDURE_OEIL links
     when Tier 1 has already been run for all votes.
 
-    Returns rows with vote_number and dec_label (needed to derive doc_id).
+    Returns rows with vote_number, dec_label, and document_reference.
+    document_reference (doceo doc_id) is preferred for deriving the doc_id
+    used in Tier 2 API calls; dec_label is the fallback.
     """
     clauses = []
     params: Dict[str, Any] = {}
@@ -202,7 +211,8 @@ def get_votes_needing_procedure(
     sql = text(f"""
         SELECT DISTINCT ON (v.vote_number)
             v.vote_number,
-            v.dec_label
+            v.dec_label,
+            v.document_reference
         FROM vote_sources vs
         JOIN votes v ON v.vote_number = vs.vote_number
         WHERE vs.source_type = 'REPORT'
@@ -218,8 +228,9 @@ def get_votes_needing_procedure(
 
     return [
         {
-            'vote_number': row.vote_number,
-            'dec_label':   row.dec_label,
+            'vote_number':        row.vote_number,
+            'dec_label':          row.dec_label,
+            'document_reference': row.document_reference,
         }
         for row in rows
     ]
@@ -457,11 +468,14 @@ def run(
             with SourcesScraper() as scraper:
                 # Group vote_numbers by doc_id so we make exactly 1 API call
                 # per unique document (multiple votes can share the same doc).
+                # Prefer document_reference (already in doceo format); fall
+                # back to parsing dec_label.
                 doc_id_to_votes: Dict[str, List[str]] = defaultdict(list)
                 for vote in candidates:
-                    dec_label = vote['dec_label']
-                    doc_ref = scraper._extract_doc_ref(dec_label) if dec_label else None
-                    doc_id  = scraper._doc_ref_to_doc_id(doc_ref) if doc_ref else None
+                    doc_id = scraper._resolve_doc_id(
+                        vote.get('document_reference'),
+                        vote.get('dec_label'),
+                    )
                     if doc_id:
                         doc_id_to_votes[doc_id].append(vote['vote_number'])
                     else:
@@ -531,9 +545,10 @@ def run(
 
         with SourcesScraper() as scraper:
             for i, vote in enumerate(votes, 1):
-                vote_number    = vote['vote_number']
-                dec_label      = vote['dec_label']
-                session_number = vote['session_number']
+                vote_number         = vote['vote_number']
+                dec_label           = vote['dec_label']
+                document_reference  = vote.get('document_reference')
+                session_number      = vote['session_number']
 
                 if i % 50 == 0 or i == len(votes):
                     logger.info(f"Processing {i}/{len(votes)}: {vote_number}")
@@ -543,6 +558,7 @@ def run(
                     vote_number=vote_number,
                     dec_label=dec_label,
                     session_number=session_number,
+                    document_reference=document_reference,
                 )
 
                 # ── Tier 2 (optional) ─────────────────────────────────────
