@@ -114,6 +114,8 @@ def get_already_populated_vote_numbers(db_session: Session) -> Set[str]:
 def get_votes_needing_summary(
     db_session: Session,
     vote_number_filter: Optional[str] = None,
+    from_date: Optional[str] = None,
+    to_date: Optional[str] = None,
 ) -> List[Dict[str, Any]]:
     """
     Return votes that have a PROCEDURE_OEIL source but no OEIL_SUMMARY yet.
@@ -121,7 +123,20 @@ def get_votes_needing_summary(
     Also returns the OEIL procedure URL (to extract procedure_ref) and the
     vote date (needed to filter the right summary in the Key events table).
     """
-    filter_clause = "AND vs.vote_number = :vote_number" if vote_number_filter else ""
+    clauses = []
+    params: Dict[str, Any] = {}
+
+    if vote_number_filter:
+        clauses.append("AND vs.vote_number = :vote_number")
+        params['vote_number'] = vote_number_filter
+    if from_date:
+        clauses.append("AND v.date >= :from_date")
+        params['from_date'] = from_date
+    if to_date:
+        clauses.append("AND v.date <= :to_date")
+        params['to_date'] = to_date
+
+    extra = "\n          ".join(clauses)
     sql = text(f"""
         SELECT DISTINCT ON (vs.vote_number)
             vs.vote_number,
@@ -130,7 +145,7 @@ def get_votes_needing_summary(
         FROM vote_sources vs
         JOIN votes v ON v.vote_number = vs.vote_number
         WHERE vs.source_type = 'PROCEDURE_OEIL'
-          {filter_clause}
+          {extra}
           AND vs.vote_number NOT IN (
               SELECT DISTINCT vote_number
               FROM vote_sources
@@ -138,7 +153,6 @@ def get_votes_needing_summary(
           )
         ORDER BY vs.vote_number, vs.id
     """)
-    params = {"vote_number": vote_number_filter} if vote_number_filter else {}
     rows = db_session.execute(sql, params).fetchall()
 
     return [
@@ -154,6 +168,8 @@ def get_votes_needing_summary(
 def get_votes_needing_procedure(
     db_session: Session,
     vote_number_filter: Optional[str] = None,
+    from_date: Optional[str] = None,
+    to_date: Optional[str] = None,
 ) -> List[Dict[str, Any]]:
     """
     Return votes that have a REPORT source but no PROCEDURE_OEIL source yet.
@@ -163,39 +179,36 @@ def get_votes_needing_procedure(
 
     Returns rows with vote_number and dec_label (needed to derive doc_id).
     """
+    clauses = []
+    params: Dict[str, Any] = {}
+
     if vote_number_filter:
-        sql = text("""
-            SELECT DISTINCT ON (v.vote_number)
-                v.vote_number,
-                v.dec_label
-            FROM vote_sources vs
-            JOIN votes v ON v.vote_number = vs.vote_number
-            WHERE vs.source_type = 'REPORT'
-              AND v.vote_number = :vote_number
-              AND vs.vote_number NOT IN (
-                  SELECT DISTINCT vote_number
-                  FROM vote_sources
-                  WHERE source_type = 'PROCEDURE_OEIL'
-              )
-            ORDER BY v.vote_number, v.id
-        """)
-        rows = db_session.execute(sql, {"vote_number": vote_number_filter}).fetchall()
-    else:
-        sql = text("""
-            SELECT DISTINCT ON (v.vote_number)
-                v.vote_number,
-                v.dec_label
-            FROM vote_sources vs
-            JOIN votes v ON v.vote_number = vs.vote_number
-            WHERE vs.source_type = 'REPORT'
-              AND vs.vote_number NOT IN (
-                  SELECT DISTINCT vote_number
-                  FROM vote_sources
-                  WHERE source_type = 'PROCEDURE_OEIL'
-              )
-            ORDER BY v.vote_number, v.id
-        """)
-        rows = db_session.execute(sql).fetchall()
+        clauses.append("AND v.vote_number = :vote_number")
+        params['vote_number'] = vote_number_filter
+    if from_date:
+        clauses.append("AND v.date >= :from_date")
+        params['from_date'] = from_date
+    if to_date:
+        clauses.append("AND v.date <= :to_date")
+        params['to_date'] = to_date
+
+    extra = "\n              ".join(clauses)
+    sql = text(f"""
+        SELECT DISTINCT ON (v.vote_number)
+            v.vote_number,
+            v.dec_label
+        FROM vote_sources vs
+        JOIN votes v ON v.vote_number = vs.vote_number
+        WHERE vs.source_type = 'REPORT'
+          {extra}
+          AND vs.vote_number NOT IN (
+              SELECT DISTINCT vote_number
+              FROM vote_sources
+              WHERE source_type = 'PROCEDURE_OEIL'
+          )
+        ORDER BY v.vote_number, v.id
+    """)
+    rows = db_session.execute(sql, params).fetchall()
 
     return [
         {
@@ -252,6 +265,8 @@ def run(
     summaries_only: bool = False,
     dry_run: bool = False,
     vote_number_filter: Optional[str] = None,
+    from_date: Optional[str] = None,
+    to_date: Optional[str] = None,
     force: bool = False,
 ) -> None:
     """Main processing loop."""
@@ -269,6 +284,10 @@ def run(
         logger.info(f"  force            = {force}")
         if vote_number_filter:
             logger.info(f"  vote_number      = {vote_number_filter}")
+        if from_date:
+            logger.info(f"  from_date        = {from_date}")
+        if to_date:
+            logger.info(f"  to_date          = {to_date}")
         logger.info("=" * 70)
 
         # ── --summaries-only mode: add missing OEIL_SUMMARY sources ──────────
@@ -276,7 +295,9 @@ def run(
         # no OEIL_SUMMARY. Scrapes the OEIL procedure-file HTML page and extracts
         # the summary link for the vote date from the "Key events" table.
         if summaries_only:
-            candidates = get_votes_needing_summary(db_session, vote_number_filter)
+            candidates = get_votes_needing_summary(
+                db_session, vote_number_filter, from_date, to_date
+            )
             logger.info(
                 f"Found {len(candidates)} votes with PROCEDURE_OEIL but no OEIL_SUMMARY"
             )
@@ -356,7 +377,9 @@ def run(
         # needed. Finds votes with REPORT but no PROCEDURE_OEIL, re-derives
         # doc_id from dec_label, fetches API, inserts only PROCEDURE_OEIL rows.
         if procedures_only:
-            candidates = get_votes_needing_procedure(db_session, vote_number_filter)
+            candidates = get_votes_needing_procedure(
+                db_session, vote_number_filter, from_date, to_date
+            )
             logger.info(
                 f"Found {len(candidates)} votes with REPORT but no PROCEDURE_OEIL"
             )
@@ -533,6 +556,20 @@ def main():
         help='Process only this vote_number (e.g. 185885)',
     )
     parser.add_argument(
+        '--from-date',
+        type=str,
+        default=None,
+        metavar='YYYY-MM-DD',
+        help='Only process votes on or after this date (e.g. 2025-01-01)',
+    )
+    parser.add_argument(
+        '--to-date',
+        type=str,
+        default=None,
+        metavar='YYYY-MM-DD',
+        help='Only process votes on or before this date (e.g. 2025-03-31)',
+    )
+    parser.add_argument(
         '--force',
         action='store_true',
         help='Re-process votes that already have sources',
@@ -553,6 +590,8 @@ def main():
         summaries_only=args.summaries_only,
         dry_run=args.dry_run,
         vote_number_filter=args.vote_number,
+        from_date=args.from_date,
+        to_date=args.to_date,
         force=args.force,
     )
 
