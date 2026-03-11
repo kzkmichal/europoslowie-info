@@ -185,39 +185,41 @@ def get_votes_needing_procedure(
     to_date: Optional[str] = None,
 ) -> List[Dict[str, Any]]:
     """
-    Return votes that have a REPORT source but no PROCEDURE_OEIL source yet.
+    Return votes that have a document_reference but no PROCEDURE_OEIL yet.
 
-    Used by --procedures-only mode to add only missing PROCEDURE_OEIL links
-    when Tier 1 has already been run for all votes.
+    Used by --procedures-only mode to add missing PROCEDURE_OEIL links via
+    the EP plenary-documents + procedures API (Tier 2).
+
+    Uses document_reference (not REPORT source) as the filter condition so
+    that RC-B (competing resolution) votes are also included. RC-B documents
+    (e.g. B-10-2026-0143) don't get REPORT sources because their RC-B doceo
+    URL doesn't exist, but the underlying B document IS linked to an OEIL
+    procedure (RSP type) via the EP API — e.g. 2026/2599(RSP) for vote 185885.
 
     Returns rows with vote_number, dec_label, and document_reference.
-    document_reference (doceo doc_id) is preferred for deriving the doc_id
-    used in Tier 2 API calls; dec_label is the fallback.
     """
-    clauses = []
+    clauses = ["v.document_reference IS NOT NULL"]
     params: Dict[str, Any] = {}
 
     if vote_number_filter:
-        clauses.append("AND v.vote_number = :vote_number")
+        clauses.append("v.vote_number = :vote_number")
         params['vote_number'] = vote_number_filter
     if from_date:
-        clauses.append("AND v.date >= :from_date")
+        clauses.append("v.date >= :from_date")
         params['from_date'] = from_date
     if to_date:
-        clauses.append("AND v.date <= :to_date")
+        clauses.append("v.date <= :to_date")
         params['to_date'] = to_date
 
-    extra = "\n              ".join(clauses)
+    where = "\n          AND ".join(clauses)
     sql = text(f"""
         SELECT DISTINCT ON (v.vote_number)
             v.vote_number,
             v.dec_label,
             v.document_reference
-        FROM vote_sources vs
-        JOIN votes v ON v.vote_number = vs.vote_number
-        WHERE vs.source_type = 'REPORT'
-          {extra}
-          AND vs.vote_number NOT IN (
+        FROM votes v
+        WHERE {where}
+          AND v.vote_number NOT IN (
               SELECT DISTINCT vote_number
               FROM vote_sources
               WHERE source_type = 'PROCEDURE_OEIL'
@@ -454,7 +456,7 @@ def run(
                 db_session, vote_number_filter, from_date, to_date
             )
             logger.info(
-                f"Found {len(candidates)} votes with REPORT but no PROCEDURE_OEIL"
+                f"Found {len(candidates)} votes with document_reference but no PROCEDURE_OEIL"
             )
 
             if not candidates:
