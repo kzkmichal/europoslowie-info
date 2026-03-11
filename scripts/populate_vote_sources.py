@@ -31,6 +31,12 @@ Usage:
 
     # Force re-insert even if sources already exist (useful after bugfix)
     python scripts/populate_vote_sources.py --force
+
+    # Remove broken REPORT sources for competing resolutions (RC-* docs).
+    # Run once after upgrading to the fixed scraper — RC-B documents don't
+    # have doceo HTML pages so their REPORT links would return 404.
+    python scripts/populate_vote_sources.py --cleanup-rc-reports
+    python scripts/populate_vote_sources.py --cleanup-rc-reports --dry-run
 """
 
 import os
@@ -258,11 +264,52 @@ def insert_sources(
     return len(records)
 
 
+def delete_rc_report_sources(db_session: Session, dry_run: bool) -> int:
+    """
+    Delete REPORT sources whose URL contains '/RC-B-' or '/RC-A-' (competing
+    resolutions). These documents don't have standalone doceo HTML pages and
+    the links return 404.
+
+    Returns count of rows deleted (or that would be deleted in dry-run).
+    """
+    count_sql = text("""
+        SELECT COUNT(*) FROM vote_sources
+        WHERE source_type = 'REPORT'
+          AND url LIKE '%/RC-%'
+    """)
+    count = db_session.execute(count_sql).scalar() or 0
+
+    if dry_run:
+        logger.info(
+            f"[dry-run] Would delete {count} REPORT sources with RC-* URLs"
+        )
+        # Show a sample
+        sample_sql = text("""
+            SELECT vote_number, url FROM vote_sources
+            WHERE source_type = 'REPORT'
+              AND url LIKE '%/RC-%'
+            LIMIT 5
+        """)
+        for row in db_session.execute(sample_sql):
+            logger.info(f"  [dry-run] delete vote_number={row.vote_number} url={row.url}")
+        return count
+
+    delete_sql = text("""
+        DELETE FROM vote_sources
+        WHERE source_type = 'REPORT'
+          AND url LIKE '%/RC-%'
+    """)
+    db_session.execute(delete_sql)
+    db_session.commit()
+    return count
+
+
 def run(
     db_url: str,
     with_procedures: bool = False,
     procedures_only: bool = False,
     summaries_only: bool = False,
+    cleanup_rc_reports: bool = False,
     dry_run: bool = False,
     vote_number_filter: Optional[str] = None,
     from_date: Optional[str] = None,
@@ -277,18 +324,33 @@ def run(
     try:
         logger.info("=" * 70)
         logger.info("populate_vote_sources — starting")
-        logger.info(f"  with_procedures  = {with_procedures}")
-        logger.info(f"  procedures_only  = {procedures_only}")
-        logger.info(f"  summaries_only   = {summaries_only}")
-        logger.info(f"  dry_run          = {dry_run}")
-        logger.info(f"  force            = {force}")
+        logger.info(f"  with_procedures    = {with_procedures}")
+        logger.info(f"  procedures_only    = {procedures_only}")
+        logger.info(f"  summaries_only     = {summaries_only}")
+        logger.info(f"  cleanup_rc_reports = {cleanup_rc_reports}")
+        logger.info(f"  dry_run            = {dry_run}")
+        logger.info(f"  force              = {force}")
         if vote_number_filter:
-            logger.info(f"  vote_number      = {vote_number_filter}")
+            logger.info(f"  vote_number        = {vote_number_filter}")
         if from_date:
-            logger.info(f"  from_date        = {from_date}")
+            logger.info(f"  from_date          = {from_date}")
         if to_date:
-            logger.info(f"  to_date          = {to_date}")
+            logger.info(f"  to_date            = {to_date}")
         logger.info("=" * 70)
+
+        # ── --cleanup-rc-reports mode: delete broken RC-* REPORT sources ─────
+        # RC-B (competing resolutions) don't have standalone doceo HTML pages.
+        # Any REPORT sources with RC-* URLs in the DB were inserted by an older
+        # version of the scraper and are broken (404). This mode removes them.
+        if cleanup_rc_reports:
+            deleted = delete_rc_report_sources(db_session, dry_run)
+            logger.info("=" * 70)
+            logger.info("populate_vote_sources — done (cleanup-rc-reports)")
+            logger.info(f"  RC-* REPORT rows deleted: {deleted}")
+            if dry_run:
+                logger.info("  (dry-run — nothing was actually deleted)")
+            logger.info("=" * 70)
+            return
 
         # ── --summaries-only mode: add missing OEIL_SUMMARY sources ──────────
         # Used when Tier 2 was already run. Finds votes with PROCEDURE_OEIL but
@@ -545,6 +607,15 @@ def main():
         ),
     )
     parser.add_argument(
+        '--cleanup-rc-reports',
+        action='store_true',
+        help=(
+            'Delete existing REPORT sources with RC-* URLs (competing resolutions '
+            'that have no doceo HTML page). Run once after upgrading to the fixed '
+            'scraper that skips RC-* documents.'
+        ),
+    )
+    parser.add_argument(
         '--dry-run',
         action='store_true',
         help='Print sources without inserting into DB',
@@ -588,6 +659,7 @@ def main():
         with_procedures=args.with_procedures,
         procedures_only=args.procedures_only,
         summaries_only=args.summaries_only,
+        cleanup_rc_reports=args.cleanup_rc_reports,
         dry_run=args.dry_run,
         vote_number_filter=args.vote_number,
         from_date=args.from_date,

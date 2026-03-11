@@ -111,7 +111,9 @@ class SourcesScraper(BaseScraper):
         Build Tier 1 source records from data already in the DB.
 
         Creates RCV_XML and VOT_XML for every vote (derived from session date),
-        and a REPORT source when dec_label contains a parseable doc reference.
+        and a REPORT source when dec_label contains a parseable doc reference
+        that is NOT an RC-B (competing resolution) document — those don't have
+        standalone doceo HTML pages and would return 404.
 
         The returned list may contain a special '_doc_id' key on REPORT entries
         (not stored in DB — used by populate_vote_sources.py to trigger Tier 2).
@@ -153,16 +155,27 @@ class SourcesScraper(BaseScraper):
         if dec_label:
             doc_ref = self._extract_doc_ref(dec_label)
             if doc_ref:
-                doc_id = self._doc_ref_to_doc_id(doc_ref)
-                if doc_id:
-                    url = f"{self.DOCEO_BASE}/{doc_id}_EN.html"
-                    sources.append({
-                        'vote_number': vote_number,
-                        'url':         url,
-                        'name':        SOURCE_NAMES['REPORT'],
-                        'source_type': 'REPORT',
-                        '_doc_id':     doc_id,   # temp key — used for Tier 2 lookup
-                    })
+                # RC-B documents are competing resolutions / joint motions for
+                # resolution. They are NOT published as standalone HTML pages on
+                # the EP doceo website (URL would 404), and the EP
+                # plenary-documents API also returns 404 for them. Skip both
+                # REPORT source and Tier 2 lookup for RC-B documents.
+                if doc_ref.startswith('RC-'):
+                    self.log_debug(
+                        f"Skipping REPORT for RC doc_ref {doc_ref!r} "
+                        f"(competing resolution — no doceo HTML page)"
+                    )
+                else:
+                    doc_id = self._doc_ref_to_doc_id(doc_ref)
+                    if doc_id:
+                        url = f"{self.DOCEO_BASE}/{doc_id}_EN.html"
+                        sources.append({
+                            'vote_number': vote_number,
+                            'url':         url,
+                            'name':        SOURCE_NAMES['REPORT'],
+                            'source_type': 'REPORT',
+                            '_doc_id':     doc_id,   # temp key — used for Tier 2 lookup
+                        })
 
         return sources
 
