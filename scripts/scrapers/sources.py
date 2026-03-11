@@ -161,7 +161,7 @@ class SourcesScraper(BaseScraper):
                 # plenary-documents API also returns 404 for them. Skip both
                 # REPORT source and Tier 2 lookup for RC-B documents.
                 if doc_ref.startswith('RC-'):
-                    self.log_debug(
+                    self.log_info(
                         f"Skipping REPORT for RC doc_ref {doc_ref!r} "
                         f"(competing resolution — no doceo HTML page)"
                     )
@@ -322,7 +322,7 @@ class SourcesScraper(BaseScraper):
                 break
 
         if not summary_id:
-            self.log_debug(
+            self.log_info(
                 f"No summary link found for {procedure_ref} on {date_str}"
             )
             return None
