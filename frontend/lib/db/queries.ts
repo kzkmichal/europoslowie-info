@@ -592,11 +592,12 @@ export async function getVoteSources(
     .orderBy(
       sql`CASE ${voteSources.sourceType}
         WHEN 'REPORT'         THEN 1
-        WHEN 'PROCEDURE_OEIL' THEN 2
-        WHEN 'PRESS_RELEASE'  THEN 3
-        WHEN 'VOT_XML'        THEN 4
-        WHEN 'RCV_XML'        THEN 5
-        ELSE 6
+        WHEN 'OEIL_SUMMARY'   THEN 2
+        WHEN 'PROCEDURE_OEIL' THEN 3
+        WHEN 'PRESS_RELEASE'  THEN 4
+        WHEN 'VOT_XML'        THEN 5
+        WHEN 'RCV_XML'        THEN 6
+        ELSE 7
       END`,
     )
 

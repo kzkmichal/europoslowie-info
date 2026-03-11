@@ -5,6 +5,7 @@ import type { BaseProps, VoteSource } from '@/lib/types'
 /** Human-readable category label shown above the links. */
 const SOURCE_CATEGORY: Record<string, string> = {
   REPORT:         'Dokumenty',
+  OEIL_SUMMARY:   'Dokumenty',
   PROCEDURE_OEIL: 'Dokumenty',
   PRESS_RELEASE:  'Dokumenty',
   VOT_XML:        'Dane techniczne',
@@ -14,6 +15,7 @@ const SOURCE_CATEGORY: Record<string, string> = {
 /** Short suffix appended to each source type link. */
 const SOURCE_TYPE_SUFFIX: Record<string, string> = {
   REPORT:         '',
+  OEIL_SUMMARY:   '',
   PROCEDURE_OEIL: '',
   PRESS_RELEASE:  '',
   VOT_XML:        ' (XML)',

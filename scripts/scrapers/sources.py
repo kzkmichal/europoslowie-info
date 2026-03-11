@@ -15,7 +15,11 @@ Three tiers of data collection:
     - PROCEDURE_OEIL: Legislative Observatory procedure file
                       (via /plenary-documents/{doc_id})
 
-  Tier 3 — async pipeline, separate from this scraper:
+  Tier 3 — 1 HTML scrape per unique (procedure_ref, vote_date):
+    - OEIL_SUMMARY: Summary document from Legislative Observatory
+                    (scrapes procedure-file page, extracts summary link)
+
+  Tier 4 — async pipeline, separate from this scraper:
     - PRESS_RELEASE:  EP press room article
                       (RSS discovery + HTML scraping, ~4 weeks latency)
 
@@ -42,8 +46,9 @@ Usage:
 """
 
 import re
-from datetime import datetime
-from typing import Any, Dict, List, Optional
+from datetime import date as date_type, datetime
+from typing import Any, Dict, List, Optional, Union
+from urllib.parse import parse_qs, urlparse
 
 from .base import BaseScraper
 
@@ -55,6 +60,7 @@ SOURCE_NAMES: Dict[str, str] = {
     'RCV_XML':        'Results of roll-call votes (XML)',
     'VOT_XML':        'Results of votes (XML)',
     'REPORT':         'Report or resolution',
+    'OEIL_SUMMARY':   'Summary (Legislative Observatory)',
     'PROCEDURE_OEIL': 'Procedure file (Legislative Observatory)',
     'PRESS_RELEASE':  'Press release',
 }
@@ -69,9 +75,11 @@ class SourcesScraper(BaseScraper):
     ready for insertion into the vote_sources table.
     """
 
-    API_BASE_URL = "https://data.europarl.europa.eu/api/v2"
-    DOCEO_BASE   = "https://www.europarl.europa.eu/doceo/document"
-    OEIL_BASE    = "https://oeil.secure.europarl.europa.eu/oeil/en/procedure-file"
+    API_BASE_URL      = "https://data.europarl.europa.eu/api/v2"
+    DOCEO_BASE        = "https://www.europarl.europa.eu/doceo/document"
+    OEIL_BASE         = "https://oeil.secure.europarl.europa.eu/oeil/en/procedure-file"
+    OEIL_SUMMARY_BASE = "https://oeil.europarl.europa.eu/oeil/en/document-summary"
+    OEIL_HTML_BASE    = "https://oeil.europarl.europa.eu/oeil/en/procedure-file"
 
     def __init__(self):
         super().__init__(
@@ -207,6 +215,129 @@ class SourcesScraper(BaseScraper):
             'name':        SOURCE_NAMES['PROCEDURE_OEIL'],
             'source_type': 'PROCEDURE_OEIL',
         }
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # Tier 3: Fetch OEIL_SUMMARY source via HTML scrape of procedure-file page
+    # ─────────────────────────────────────────────────────────────────────────
+
+    def fetch_summary_source(
+        self,
+        vote_number: str,
+        procedure_ref: str,
+        vote_date: Union[date_type, datetime],
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Fetch OEIL_SUMMARY source for a vote via HTML scraping.
+
+        Fetches the OEIL procedure-file HTML page and finds the summary link
+        for the given vote date in the "Key events" table.
+
+        Args:
+            vote_number:    Vote identifier (for the source record)
+            procedure_ref:  OEIL-format procedure reference, e.g. "2025/0218(NLE)"
+            vote_date:      Date of the vote (date or datetime object)
+
+        Returns:
+            Source dict with OEIL_SUMMARY type, or None if no summary found
+        """
+        from bs4 import BeautifulSoup
+
+        # Normalize to date object
+        if isinstance(vote_date, datetime):
+            vote_date = vote_date.date()
+        date_str = vote_date.strftime('%d/%m/%Y')   # format OEIL uses in the table
+
+        url = f"{self.OEIL_HTML_BASE}?reference={procedure_ref}"
+
+        try:
+            response = self.http.get(
+                url,
+                headers={'Accept': 'text/html,application/xhtml+xml;q=0.9,*/*;q=0.8'},
+            )
+            response.raise_for_status()
+        except Exception as e:
+            self.log_warning(
+                f"Failed to fetch OEIL procedure page for {procedure_ref}: {e}"
+            )
+            return None
+
+        try:
+            doc = BeautifulSoup(response.text, 'lxml')
+        except Exception as e:
+            self.log_warning(
+                f"Failed to parse OEIL HTML for {procedure_ref}: {e}"
+            )
+            return None
+
+        # ── Find the "Key events" section ────────────────────────────────────
+        key_events_section = None
+        for section in doc.select('.es_product-section'):
+            heading = section.select_one('h2')
+            if heading and 'Key events' in heading.get_text():
+                key_events_section = section
+                break
+
+        if not key_events_section:
+            self.log_warning(
+                f"Could not find 'Key events' section for {procedure_ref}"
+            )
+            return None
+
+        # ── Find row matching vote date + "Decision by Parliament" ────────────
+        summary_id = None
+        for row in key_events_section.select('tr'):
+            cells_text = [td.get_text(strip=True) for td in row.select('td')]
+
+            if date_str not in cells_text:
+                continue
+            if not any('Decision by Parliament' in c for c in cells_text):
+                continue
+
+            for link in row.select('a'):
+                href = link.get('href', '')
+                if 'document-summary?id=' not in href:
+                    continue
+                link_text = link.get_text(strip=True)
+                if 'Summary' not in link_text:
+                    continue
+                match = re.search(r'document-summary\?id=(\d+)', href)
+                if match:
+                    summary_id = int(match.group(1))
+                    break
+
+            if summary_id:
+                break
+
+        if not summary_id:
+            self.log_debug(
+                f"No summary link found for {procedure_ref} on {date_str}"
+            )
+            return None
+
+        summary_url = f"{self.OEIL_SUMMARY_BASE}?id={summary_id}"
+        self.log_info(
+            f"Found summary {summary_id} for {procedure_ref} on {date_str}"
+        )
+        return {
+            'vote_number': vote_number,
+            'url':         summary_url,
+            'name':        SOURCE_NAMES['OEIL_SUMMARY'],
+            'source_type': 'OEIL_SUMMARY',
+        }
+
+    @staticmethod
+    def extract_procedure_ref_from_url(oeil_url: str) -> Optional[str]:
+        """
+        Extract the procedure reference from an OEIL procedure-file URL.
+
+        "https://oeil.secure.europarl.europa.eu/oeil/en/procedure-file?reference=2025/0045(COD)"
+        → "2025/0045(COD)"
+        """
+        try:
+            qs = parse_qs(urlparse(oeil_url).query)
+            return qs.get('reference', [None])[0]
+        except Exception:
+            return None
 
     def _fetch_proc_id_from_document(self, doc_id: str) -> Optional[str]:
         """

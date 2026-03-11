@@ -19,6 +19,10 @@ Usage:
     # PROCEDURE_OEIL yet (use after Tier 1 was already run for all votes)
     python scripts/populate_vote_sources.py --procedures-only
 
+    # Tier 3 only — add OEIL_SUMMARY for votes that have PROCEDURE_OEIL but
+    # no OEIL_SUMMARY yet (scrapes OEIL HTML procedure-file page)
+    python scripts/populate_vote_sources.py --summaries-only
+
     # Preview without inserting
     python scripts/populate_vote_sources.py --dry-run
 
@@ -105,6 +109,46 @@ def get_already_populated_vote_numbers(db_session: Session) -> Set[str]:
         text("SELECT DISTINCT vote_number FROM vote_sources")
     ).fetchall()
     return {row.vote_number for row in rows}
+
+
+def get_votes_needing_summary(
+    db_session: Session,
+    vote_number_filter: Optional[str] = None,
+) -> List[Dict[str, Any]]:
+    """
+    Return votes that have a PROCEDURE_OEIL source but no OEIL_SUMMARY yet.
+
+    Also returns the OEIL procedure URL (to extract procedure_ref) and the
+    vote date (needed to filter the right summary in the Key events table).
+    """
+    filter_clause = "AND vs.vote_number = :vote_number" if vote_number_filter else ""
+    sql = text(f"""
+        SELECT DISTINCT ON (vs.vote_number)
+            vs.vote_number,
+            vs.url         AS procedure_url,
+            v.date         AS vote_date
+        FROM vote_sources vs
+        JOIN votes v ON v.vote_number = vs.vote_number
+        WHERE vs.source_type = 'PROCEDURE_OEIL'
+          {filter_clause}
+          AND vs.vote_number NOT IN (
+              SELECT DISTINCT vote_number
+              FROM vote_sources
+              WHERE source_type = 'OEIL_SUMMARY'
+          )
+        ORDER BY vs.vote_number, vs.id
+    """)
+    params = {"vote_number": vote_number_filter} if vote_number_filter else {}
+    rows = db_session.execute(sql, params).fetchall()
+
+    return [
+        {
+            'vote_number':   row.vote_number,
+            'procedure_url': row.procedure_url,
+            'vote_date':     row.vote_date,
+        }
+        for row in rows
+    ]
 
 
 def get_votes_needing_procedure(
@@ -205,6 +249,7 @@ def run(
     db_url: str,
     with_procedures: bool = False,
     procedures_only: bool = False,
+    summaries_only: bool = False,
     dry_run: bool = False,
     vote_number_filter: Optional[str] = None,
     force: bool = False,
@@ -219,11 +264,92 @@ def run(
         logger.info("populate_vote_sources — starting")
         logger.info(f"  with_procedures  = {with_procedures}")
         logger.info(f"  procedures_only  = {procedures_only}")
+        logger.info(f"  summaries_only   = {summaries_only}")
         logger.info(f"  dry_run          = {dry_run}")
         logger.info(f"  force            = {force}")
         if vote_number_filter:
             logger.info(f"  vote_number      = {vote_number_filter}")
         logger.info("=" * 70)
+
+        # ── --summaries-only mode: add missing OEIL_SUMMARY sources ──────────
+        # Used when Tier 2 was already run. Finds votes with PROCEDURE_OEIL but
+        # no OEIL_SUMMARY. Scrapes the OEIL procedure-file HTML page and extracts
+        # the summary link for the vote date from the "Key events" table.
+        if summaries_only:
+            candidates = get_votes_needing_summary(db_session, vote_number_filter)
+            logger.info(
+                f"Found {len(candidates)} votes with PROCEDURE_OEIL but no OEIL_SUMMARY"
+            )
+
+            if not candidates:
+                logger.info("Nothing to do.")
+                return
+
+            total_inserted = 0
+            summary_hits = 0
+            summary_misses = 0
+
+            with SourcesScraper() as scraper:
+                # Group vote_numbers by (procedure_ref, vote_date) so we make
+                # exactly 1 HTML fetch per unique combination.
+                key_to_votes: Dict[tuple, List[str]] = defaultdict(list)
+                for vote in candidates:
+                    proc_ref = SourcesScraper.extract_procedure_ref_from_url(
+                        vote['procedure_url']
+                    )
+                    if not proc_ref:
+                        summary_misses += 1
+                        continue
+                    vote_date = vote['vote_date']
+                    if hasattr(vote_date, 'date'):
+                        vote_date = vote_date.date()
+                    key = (proc_ref, vote_date.strftime('%Y-%m-%d'))
+                    key_to_votes[key].append(vote['vote_number'])
+
+                unique_keys = list(key_to_votes.items())
+                logger.info(
+                    f"Unique (procedure_ref, date) combos: {len(unique_keys)} "
+                    f"(from {len(candidates)} candidates)"
+                )
+
+                for i, ((proc_ref, date_str), vote_numbers) in enumerate(
+                    unique_keys, 1
+                ):
+                    if i % 50 == 0 or i == len(unique_keys):
+                        logger.info(
+                            f"Processing {i}/{len(unique_keys)}: "
+                            f"{proc_ref} @ {date_str}"
+                        )
+
+                    from datetime import date as _date
+                    vote_date_obj = _date.fromisoformat(date_str)
+
+                    summary_src = scraper.fetch_summary_source(
+                        vote_number=vote_numbers[0],
+                        procedure_ref=proc_ref,
+                        vote_date=vote_date_obj,
+                    )
+                    if summary_src:
+                        sources_to_insert = [
+                            {**summary_src, 'vote_number': vn}
+                            for vn in vote_numbers
+                        ]
+                        n = insert_sources(db_session, sources_to_insert, dry_run)
+                        total_inserted += n
+                        summary_hits += 1
+                    else:
+                        summary_misses += 1
+
+            logger.info("=" * 70)
+            logger.info("populate_vote_sources — done (summaries-only)")
+            logger.info(f"  Candidates:       {len(candidates)}")
+            logger.info(f"  Summaries inserted: {total_inserted}")
+            logger.info(f"  Summary hits:     {summary_hits}")
+            logger.info(f"  Summary misses:   {summary_misses}")
+            if dry_run:
+                logger.info("  (dry-run — nothing was actually inserted)")
+            logger.info("=" * 70)
+            return
 
         # ── --procedures-only mode: add missing PROCEDURE_OEIL sources ────────
         # Used when Tier 1 was already run for all votes and only Tier 2 is
@@ -388,6 +514,14 @@ def main():
         ),
     )
     parser.add_argument(
+        '--summaries-only',
+        action='store_true',
+        help=(
+            'Fetch OEIL_SUMMARY only for votes that already have PROCEDURE_OEIL '
+            'but no OEIL_SUMMARY yet. Scrapes the OEIL procedure-file HTML page.'
+        ),
+    )
+    parser.add_argument(
         '--dry-run',
         action='store_true',
         help='Print sources without inserting into DB',
@@ -416,6 +550,7 @@ def main():
         db_url=db_url,
         with_procedures=args.with_procedures,
         procedures_only=args.procedures_only,
+        summaries_only=args.summaries_only,
         dry_run=args.dry_run,
         vote_number_filter=args.vote_number,
         force=args.force,

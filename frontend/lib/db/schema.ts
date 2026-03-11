@@ -150,6 +150,7 @@ export const SOURCE_TYPES = [
   'RCV_XML',        // Results of roll-call votes (XML) — EP doceo, generated from meeting_id
   'VOT_XML',        // Results of votes (XML) — EP doceo, generated from meeting_id
   'REPORT',         // Report or resolution (HTML) — EP doceo, derived from dec_label doc_ref
+  'OEIL_SUMMARY',   // Vote summary (Legislative Observatory) — HTML scrape of procedure-file page
   'PROCEDURE_OEIL', // Procedure file (Legislative Observatory) — requires extra EP API call
   'PRESS_RELEASE',  // Press release — requires async RSS scraping pipeline
 ] as const
