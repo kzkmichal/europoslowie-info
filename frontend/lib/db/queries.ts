@@ -343,34 +343,93 @@ export async function getVotesList(
 
   const whereClause = and(...conditions)
 
+  // Priority filters for representative vote selection within each (title, session) group:
+  // 1. "całość tekstu" / "cały tekst" — final vote on the whole text
+  // 2. "Wstępne porozumienie" — provisional agreement
+  // 3. "Wniosek o odrzucenie" — proposal to reject
+  // 4. fallback: highest vote_number (latest in session)
+  const isFinal = sql`(${votes.decLabel} ILIKE '%całość tekstu%' OR ${votes.decLabel} ILIKE '%cały tekst%')`
+  const isProvisional = sql`${votes.decLabel} ILIKE '%Wstępne porozumienie%'`
+  const isRejection = sql`${votes.decLabel} ILIKE '%Wniosek o odrzucenie%'`
+
   const [totalResult, votesList] = await Promise.all([
     db
-      .select({ count: sql<number>`COUNT(DISTINCT ${votes.voteNumber})` })
+      .select({ count: sql<number>`COUNT(DISTINCT (${votes.title}, ${votes.sessionId}))::int` })
       .from(votes)
       .where(whereClause),
 
     db
       .select({
         id: min(votes.id),
-        voteNumber: votes.voteNumber,
-        title: max(votes.title),
+        voteNumber: sql<string | null>`COALESCE(
+          MAX(${votes.voteNumber}) FILTER (WHERE ${isFinal}),
+          MAX(${votes.voteNumber}) FILTER (WHERE ${isProvisional}),
+          MAX(${votes.voteNumber}) FILTER (WHERE ${isRejection}),
+          MAX(${votes.voteNumber})
+        )`,
+        title: votes.title,
         titleEn: max(votes.titleEn),
         date: max(votes.date),
-        result: max(votes.result),
-        votesFor: max(votes.votesFor),
-        votesAgainst: max(votes.votesAgainst),
-        votesAbstain: max(votes.votesAbstain),
-        starsPoland: max(votes.starsPoland),
-        polishVotesFor: max(votes.polishVotesFor),
-        polishVotesAgainst: max(votes.polishVotesAgainst),
-        polishVotesAbstain: max(votes.polishVotesAbstain),
-        polishVotesAbsent: max(votes.polishVotesAbsent),
+        result: sql<string | null>`COALESCE(
+          MAX(${votes.result}) FILTER (WHERE ${isFinal}),
+          MAX(${votes.result}) FILTER (WHERE ${isProvisional}),
+          MAX(${votes.result}) FILTER (WHERE ${isRejection}),
+          MAX(${votes.result})
+        )`,
+        votesFor: sql<number | null>`COALESCE(
+          MAX(${votes.votesFor}) FILTER (WHERE ${isFinal}),
+          MAX(${votes.votesFor}) FILTER (WHERE ${isProvisional}),
+          MAX(${votes.votesFor}) FILTER (WHERE ${isRejection}),
+          MAX(${votes.votesFor})
+        )`,
+        votesAgainst: sql<number | null>`COALESCE(
+          MAX(${votes.votesAgainst}) FILTER (WHERE ${isFinal}),
+          MAX(${votes.votesAgainst}) FILTER (WHERE ${isProvisional}),
+          MAX(${votes.votesAgainst}) FILTER (WHERE ${isRejection}),
+          MAX(${votes.votesAgainst})
+        )`,
+        votesAbstain: sql<number | null>`COALESCE(
+          MAX(${votes.votesAbstain}) FILTER (WHERE ${isFinal}),
+          MAX(${votes.votesAbstain}) FILTER (WHERE ${isProvisional}),
+          MAX(${votes.votesAbstain}) FILTER (WHERE ${isRejection}),
+          MAX(${votes.votesAbstain})
+        )`,
+        starsPoland: sql<number | null>`COALESCE(
+          MAX(${votes.starsPoland}) FILTER (WHERE ${isFinal}),
+          MAX(${votes.starsPoland}) FILTER (WHERE ${isProvisional}),
+          MAX(${votes.starsPoland}) FILTER (WHERE ${isRejection}),
+          MAX(${votes.starsPoland})
+        )`,
+        polishVotesFor: sql<number | null>`COALESCE(
+          MAX(${votes.polishVotesFor}) FILTER (WHERE ${isFinal}),
+          MAX(${votes.polishVotesFor}) FILTER (WHERE ${isProvisional}),
+          MAX(${votes.polishVotesFor}) FILTER (WHERE ${isRejection}),
+          MAX(${votes.polishVotesFor})
+        )`,
+        polishVotesAgainst: sql<number | null>`COALESCE(
+          MAX(${votes.polishVotesAgainst}) FILTER (WHERE ${isFinal}),
+          MAX(${votes.polishVotesAgainst}) FILTER (WHERE ${isProvisional}),
+          MAX(${votes.polishVotesAgainst}) FILTER (WHERE ${isRejection}),
+          MAX(${votes.polishVotesAgainst})
+        )`,
+        polishVotesAbstain: sql<number | null>`COALESCE(
+          MAX(${votes.polishVotesAbstain}) FILTER (WHERE ${isFinal}),
+          MAX(${votes.polishVotesAbstain}) FILTER (WHERE ${isProvisional}),
+          MAX(${votes.polishVotesAbstain}) FILTER (WHERE ${isRejection}),
+          MAX(${votes.polishVotesAbstain})
+        )`,
+        polishVotesAbsent: sql<number | null>`COALESCE(
+          MAX(${votes.polishVotesAbsent}) FILTER (WHERE ${isFinal}),
+          MAX(${votes.polishVotesAbsent}) FILTER (WHERE ${isProvisional}),
+          MAX(${votes.polishVotesAbsent}) FILTER (WHERE ${isRejection}),
+          MAX(${votes.polishVotesAbsent})
+        )`,
         sessionId: votes.sessionId,
       })
       .from(votes)
       .where(whereClause)
-      .groupBy(votes.voteNumber, votes.sessionId)
-      .orderBy(desc(max(votes.date)), votes.voteNumber)
+      .groupBy(votes.title, votes.sessionId)
+      .orderBy(desc(max(votes.date)), min(votes.id))
       .limit(limit)
       .offset(offset),
   ])
@@ -542,20 +601,65 @@ export async function getMepVotesBySession(
 
   const mepId = mep[0].id
 
+  // Priority filters — same logic as getVotesList:
+  // prefer "całość tekstu" > "Wstępne porozumienie" > "Wniosek o odrzucenie" > latest vote
+  const isFinal = sql`(${votes.decLabel} ILIKE '%całość tekstu%' OR ${votes.decLabel} ILIKE '%cały tekst%')`
+  const isProvisional = sql`${votes.decLabel} ILIKE '%Wstępne porozumienie%'`
+  const isRejection = sql`${votes.decLabel} ILIKE '%Wniosek o odrzucenie%'`
+
   const votesList = await db
     .select({
-      id: votes.id,
-      voteNumber: votes.voteNumber,
+      id: min(votes.id),
+      voteNumber: sql<string | null>`COALESCE(
+        MAX(${votes.voteNumber}) FILTER (WHERE ${isFinal}),
+        MAX(${votes.voteNumber}) FILTER (WHERE ${isProvisional}),
+        MAX(${votes.voteNumber}) FILTER (WHERE ${isRejection}),
+        MAX(${votes.voteNumber})
+      )`,
       title: votes.title,
-      titleEn: votes.titleEn,
-      date: votes.date,
-      voteChoice: votes.voteChoice,
-      result: votes.result,
-      votesFor: votes.votesFor,
-      votesAgainst: votes.votesAgainst,
-      votesAbstain: votes.votesAbstain,
-      starsPoland: votes.starsPoland,
+      titleEn: max(votes.titleEn),
+      date: max(votes.date),
+      // For voteChoice use ARRAY_AGG ordered by vote_number DESC so the fallback
+      // correctly picks the MEP's choice on the latest (most final) vote
+      voteChoice: sql<string>`COALESCE(
+        MAX(${votes.voteChoice}) FILTER (WHERE ${isFinal}),
+        MAX(${votes.voteChoice}) FILTER (WHERE ${isProvisional}),
+        MAX(${votes.voteChoice}) FILTER (WHERE ${isRejection}),
+        (ARRAY_AGG(${votes.voteChoice} ORDER BY ${votes.voteNumber} DESC))[1]
+      )`,
+      result: sql<string | null>`COALESCE(
+        MAX(${votes.result}) FILTER (WHERE ${isFinal}),
+        MAX(${votes.result}) FILTER (WHERE ${isProvisional}),
+        MAX(${votes.result}) FILTER (WHERE ${isRejection}),
+        MAX(${votes.result})
+      )`,
+      votesFor: sql<number | null>`COALESCE(
+        MAX(${votes.votesFor}) FILTER (WHERE ${isFinal}),
+        MAX(${votes.votesFor}) FILTER (WHERE ${isProvisional}),
+        MAX(${votes.votesFor}) FILTER (WHERE ${isRejection}),
+        MAX(${votes.votesFor})
+      )`,
+      votesAgainst: sql<number | null>`COALESCE(
+        MAX(${votes.votesAgainst}) FILTER (WHERE ${isFinal}),
+        MAX(${votes.votesAgainst}) FILTER (WHERE ${isProvisional}),
+        MAX(${votes.votesAgainst}) FILTER (WHERE ${isRejection}),
+        MAX(${votes.votesAgainst})
+      )`,
+      votesAbstain: sql<number | null>`COALESCE(
+        MAX(${votes.votesAbstain}) FILTER (WHERE ${isFinal}),
+        MAX(${votes.votesAbstain}) FILTER (WHERE ${isProvisional}),
+        MAX(${votes.votesAbstain}) FILTER (WHERE ${isRejection}),
+        MAX(${votes.votesAbstain})
+      )`,
+      starsPoland: sql<number | null>`COALESCE(
+        MAX(${votes.starsPoland}) FILTER (WHERE ${isFinal}),
+        MAX(${votes.starsPoland}) FILTER (WHERE ${isProvisional}),
+        MAX(${votes.starsPoland}) FILTER (WHERE ${isRejection}),
+        MAX(${votes.starsPoland})
+      )`,
       sessionId: votes.sessionId,
+      // How many sub-votes (Ust., Popr.) were grouped here beyond the representative
+      relatedCount: sql<number>`GREATEST(COUNT(*) - 1, 0)::int`,
     })
     .from(votes)
     .where(
@@ -565,7 +669,8 @@ export async function getMepVotesBySession(
         eq(votes.sessionId, sessionId),
       ),
     )
-    .orderBy(asc(votes.voteNumber))
+    .groupBy(votes.title, votes.sessionId)
+    .orderBy(sql`MAX(${votes.voteNumber}) ASC`)
 
   return votesList.map((v) => ({
     ...v,

@@ -38,6 +38,11 @@ export const VoteRow = ({ vote }: VoteRowProps) => {
           })}
         </p>
       </div>
+      {vote.relatedCount != null && vote.relatedCount > 0 && (
+        <span className="shrink-0 rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-500">
+          +{vote.relatedCount} głosowań
+        </span>
+      )}
       {vote.voteNumber && (
         <a
           href={`/glosowania/${vote.voteNumber}`}

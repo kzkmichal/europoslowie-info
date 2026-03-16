@@ -124,6 +124,7 @@ export type MEPVote = {
   votesAbstain: number | null
   starsPoland: number | null
   sessionId: number
+  relatedCount?: number
 }
 
 /**
