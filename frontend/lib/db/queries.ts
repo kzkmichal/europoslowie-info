@@ -271,43 +271,91 @@ export async function getMepVotes(
 
   const mepId = mep[0].id
 
-  const conditions = [eq(votes.mepId, mepId)]
+  const conditions = [eq(votes.mepId, mepId), eq(votes.isMain, true)]
   if (voteChoice) {
     conditions.push(eq(votes.voteChoice, voteChoice))
   }
 
+  // Priority filters — same logic as getVotesList and getMepVotesBySession:
+  // prefer "całość tekstu" > "Wstępne porozumienie" > "Wniosek o odrzucenie" > latest vote
+  const isFinal = sql`(${votes.decLabel} ILIKE '%całość tekstu%' OR ${votes.decLabel} ILIKE '%cały tekst%')`
+  const isProvisional = sql`${votes.decLabel} ILIKE '%Wstępne porozumienie%'`
+  const isRejection = sql`${votes.decLabel} ILIKE '%Wniosek o odrzucenie%'`
+
   const [totalResult, votesList] = await Promise.all([
     db
-      .select({ count: count() })
+      .select({ count: sql<number>`COUNT(DISTINCT (${votes.title}, ${votes.sessionId}))::int` })
       .from(votes)
       .where(and(...conditions)),
 
     db
       .select({
-        id: votes.id,
-        voteNumber: votes.voteNumber,
+        id: min(votes.id),
+        voteNumber: sql<string | null>`COALESCE(
+          MAX(${votes.voteNumber}) FILTER (WHERE ${isFinal}),
+          MAX(${votes.voteNumber}) FILTER (WHERE ${isProvisional}),
+          MAX(${votes.voteNumber}) FILTER (WHERE ${isRejection}),
+          MAX(${votes.voteNumber})
+        )`,
         title: votes.title,
-        titleEn: votes.titleEn,
-        date: votes.date,
-        voteChoice: votes.voteChoice,
-        result: votes.result,
-        votesFor: votes.votesFor,
-        votesAgainst: votes.votesAgainst,
-        votesAbstain: votes.votesAbstain,
-        starsPoland: votes.starsPoland,
+        titleEn: max(votes.titleEn),
+        date: max(votes.date),
+        voteChoice: sql<string>`COALESCE(
+          MAX(${votes.voteChoice}) FILTER (WHERE ${isFinal}),
+          MAX(${votes.voteChoice}) FILTER (WHERE ${isProvisional}),
+          MAX(${votes.voteChoice}) FILTER (WHERE ${isRejection}),
+          (ARRAY_AGG(${votes.voteChoice} ORDER BY ${votes.voteNumber} DESC))[1]
+        )`,
+        result: sql<string | null>`COALESCE(
+          MAX(${votes.result}) FILTER (WHERE ${isFinal}),
+          MAX(${votes.result}) FILTER (WHERE ${isProvisional}),
+          MAX(${votes.result}) FILTER (WHERE ${isRejection}),
+          MAX(${votes.result})
+        )`,
+        votesFor: sql<number | null>`COALESCE(
+          MAX(${votes.votesFor}) FILTER (WHERE ${isFinal}),
+          MAX(${votes.votesFor}) FILTER (WHERE ${isProvisional}),
+          MAX(${votes.votesFor}) FILTER (WHERE ${isRejection}),
+          MAX(${votes.votesFor})
+        )`,
+        votesAgainst: sql<number | null>`COALESCE(
+          MAX(${votes.votesAgainst}) FILTER (WHERE ${isFinal}),
+          MAX(${votes.votesAgainst}) FILTER (WHERE ${isProvisional}),
+          MAX(${votes.votesAgainst}) FILTER (WHERE ${isRejection}),
+          MAX(${votes.votesAgainst})
+        )`,
+        votesAbstain: sql<number | null>`COALESCE(
+          MAX(${votes.votesAbstain}) FILTER (WHERE ${isFinal}),
+          MAX(${votes.votesAbstain}) FILTER (WHERE ${isProvisional}),
+          MAX(${votes.votesAbstain}) FILTER (WHERE ${isRejection}),
+          MAX(${votes.votesAbstain})
+        )`,
+        starsPoland: sql<number | null>`COALESCE(
+          MAX(${votes.starsPoland}) FILTER (WHERE ${isFinal}),
+          MAX(${votes.starsPoland}) FILTER (WHERE ${isProvisional}),
+          MAX(${votes.starsPoland}) FILTER (WHERE ${isRejection}),
+          MAX(${votes.starsPoland})
+        )`,
         sessionId: votes.sessionId,
+        relatedCount: sql<number>`GREATEST(COUNT(*) - 1, 0)::int`,
       })
       .from(votes)
       .where(and(...conditions))
-      .orderBy(desc(votes.date))
+      .groupBy(votes.title, votes.sessionId)
+      .orderBy(desc(max(votes.date)), min(votes.id))
       .limit(limit)
       .offset(offset),
   ])
 
-  const total = totalResult[0]?.count ?? 0
+  const total = Number(totalResult[0]?.count ?? 0)
 
   return {
-    votes: votesList,
+    votes: votesList.map((v) => ({
+      ...v,
+      id: v.id ?? 0,
+      title: v.title ?? '',
+      date: v.date ?? new Date(),
+    })),
     total,
     page,
     limit,
