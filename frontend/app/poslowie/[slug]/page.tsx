@@ -4,13 +4,13 @@ import {
   getMepVotesBySession,
 } from '@/lib/db/queries'
 import { notFound } from 'next/navigation'
-import { Container } from '@/components/Container'
-import { StatsTable } from '@/components/StatsTable'
-import { VoteCard } from '@/components/VoteCard'
-import { CommitteeList } from '@/components/CommitteeList'
+import { Container } from '@/components/layout/Container'
+import { StatsTable } from '@/components/meps/StatsTable'
+import { VoteCard } from '@/components/votes/VoteCard'
+import { CommitteeList } from '@/components/meps/CommitteeList'
 import type { Metadata } from 'next'
-import VoteSessionNav from '@/components/VoteSessionNav'
-import { VoteRow } from '@/components/VoteRow'
+import VoteSessionNav from '@/components/meps/VoteSessionNav'
+import { VoteRow } from '@/components/votes/VoteRow'
 
 export type PageParams = {
   params: Promise<{ slug: string }>

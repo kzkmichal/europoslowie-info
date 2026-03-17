@@ -6,9 +6,9 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from './ui/select'
+} from '@/components/ui/select'
 import { useRouter, usePathname, useSearchParams } from 'next/navigation'
-import { Button } from './ui/button'
+import { Button } from '@/components/ui/button'
 
 type VotesFilterProps = {
   year?: number
