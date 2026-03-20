@@ -12,6 +12,7 @@ export type PageProps = {
     year: string
     month: string
     result: string
+    search: string
   }>
 }
 
@@ -27,6 +28,7 @@ export default async function GlosowaniaPage({ searchParams }: PageProps) {
   const page = Math.max(1, Number(params?.page) || 1)
   const year = params?.year ? Number(params?.year) : undefined
   const month = year && params?.month ? Number(params?.month) : undefined
+  const search = params?.search ? String(params?.search) : undefined
   const result =
     params?.result === 'ADOPTED' || params?.result === 'REJECTED'
       ? params?.result
@@ -38,6 +40,7 @@ export default async function GlosowaniaPage({ searchParams }: PageProps) {
     year,
     month,
     result,
+    search,
   })
 
   const votesByDate = votes.reduce(
@@ -58,6 +61,7 @@ export default async function GlosowaniaPage({ searchParams }: PageProps) {
       year: year ? String(year) : undefined,
       month: month ? String(month) : undefined,
       result: result || undefined,
+      search: search || undefined,
       ...overrides,
     }
     const params = new URLSearchParams(
@@ -77,7 +81,12 @@ export default async function GlosowaniaPage({ searchParams }: PageProps) {
             {total} głosowań z udziałem polskich europosłów
           </p>
         </div>
-        <VotesFilter year={year} month={month} result={result} />
+        <VotesFilter
+          year={year}
+          month={month}
+          result={result}
+          search={search}
+        />
         {votes.length === 0 ? (
           <p className="text-gray-500">Brak głosowań do wyświetlenia.</p>
         ) : (

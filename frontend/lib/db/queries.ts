@@ -372,9 +372,10 @@ export async function getVotesList(
     year?: number
     month?: number
     result?: 'ADOPTED' | 'REJECTED'
+    search?: string
   } = {},
 ): Promise<VotesList> {
-  const { page = 1, limit = 20, year, month, result } = options
+  const { page = 1, limit = 20, year, month, result, search } = options
   const offset = (page - 1) * limit
 
   const conditions = [eq(votes.isMain, true)]
@@ -389,6 +390,10 @@ export async function getVotesList(
 
   if (result) {
     conditions.push(eq(votes.result, result))
+  }
+
+  if (search) {
+    conditions.push(sql`${votes.title} ILIKE ${'%' + search + '%'}`)
   }
 
   const whereClause = and(...conditions)

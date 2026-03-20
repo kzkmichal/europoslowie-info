@@ -24,6 +24,7 @@ export const MEPGrid = ({ meps }: MEPSGridProps) => {
     filters,
     handleNationalPartyChange,
     handleEpGroupChange,
+    handleAttendanceRangeChange,
     hasActiveFilters,
     clearFilters,
     sortBy,
@@ -58,7 +59,7 @@ export const MEPGrid = ({ meps }: MEPSGridProps) => {
 
   return (
     <>
-      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:flex-wrap">
         <Input
           placeholder="Szukaj posła..."
           className="sm:max-w-xs"
@@ -96,6 +97,20 @@ export const MEPGrid = ({ meps }: MEPSGridProps) => {
                 {group}
               </SelectItem>
             ))}
+          </SelectContent>
+        </Select>
+        <Select
+          value={filters.attendanceRange || '__all__'}
+          onValueChange={handleAttendanceRangeChange}
+        >
+          <SelectTrigger className="sm:max-w-50">
+            <SelectValue placeholder="Frekwencja" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="__all__">Wszystkie frekwencje</SelectItem>
+            <SelectItem value="high">Wysoka ≥90%</SelectItem>
+            <SelectItem value="medium">Średnia 70–89%</SelectItem>
+            <SelectItem value="low">Niska &lt;70%</SelectItem>
           </SelectContent>
         </Select>
         <Select value={sortBy} onValueChange={handleSortBy}>

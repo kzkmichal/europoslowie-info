@@ -1,47 +1,79 @@
 import { MEPWithStats } from '@/lib/types'
 import { useEffect, useMemo, useState } from 'react'
+import { useRouter, usePathname, useSearchParams } from 'next/navigation'
+import { useDebounce } from './useDebounce'
 
 export type UseFilterMEPProps = {
   initialList?: MEPWithStats[]
 }
 
-export const useDebounce = (delay: number, value?: string) => {
-  const [debouncedValue, setDebouncedValue] = useState(value)
+export const useFilterMEP = ({ initialList }: UseFilterMEPProps) => {
+  const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+
+  const [searchInput, setSearchInput] = useState(
+    () => searchParams.get('search') ?? '',
+  )
+  const debouncedSearch = useDebounce(300, searchInput)
+
+  const nationalParty = searchParams.get('party') ?? ''
+  const epGroup = searchParams.get('group') ?? ''
+  const attendanceRange = searchParams.get('attendance') ?? ''
+  const sortBy = (searchParams.get('sort') ?? 'ranking') as
+    | 'ranking'
+    | 'attendance'
+    | 'name'
 
   useEffect(() => {
-    const handler = setTimeout(() => {
-      setDebouncedValue(value)
-    }, delay)
+    const currentInUrl = searchParams.get('search') ?? ''
+    if ((debouncedSearch ?? '') === currentInUrl) return
 
-    return () => {
-      clearTimeout(handler)
+    const params = new URLSearchParams(searchParams.toString())
+    if (debouncedSearch) {
+      params.set('search', debouncedSearch)
+    } else {
+      params.delete('search')
     }
-  }, [value, delay])
+    const newUrl = params.toString()
+      ? `${pathname}?${params.toString()}`
+      : pathname
+    router.replace(newUrl)
+  }, [debouncedSearch]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  return debouncedValue
-}
-
-export const useFilterMEP = ({ initialList }: UseFilterMEPProps) => {
-  const [filters, setFilters] = useState({
-    search: '',
-    nationalParty: '',
-    epGroup: '',
-  })
-  const [sortBy, setSortBy] = useState<'ranking' | 'attendance' | 'name'>(
-    'ranking',
-  )
-  const debouncedSearchTerm = useDebounce(300, filters.search)
+  const updateParam = (key: string, value: string) => {
+    const params = new URLSearchParams(searchParams.toString())
+    if (!value) {
+      params.delete(key)
+    } else {
+      params.set(key, value)
+    }
+    const newUrl = params.toString()
+      ? `${pathname}?${params.toString()}`
+      : pathname
+    router.replace(newUrl)
+  }
 
   const filteredList = useMemo(() => {
     return (initialList ?? [])
       .filter((mep) => {
         const matchesSearch = mep.fullName
           .toLowerCase()
-          .includes(debouncedSearchTerm?.toLowerCase() ?? '')
+          .includes(debouncedSearch?.toLowerCase() ?? '')
         const matchesParty =
-          !filters.nationalParty || mep.nationalParty === filters.nationalParty
-        const matchesGroup = !filters.epGroup || mep.epGroup === filters.epGroup
-        return matchesSearch && matchesParty && matchesGroup
+          !nationalParty || mep.nationalParty === nationalParty
+        const matchesGroup = !epGroup || mep.epGroup === epGroup
+
+        const rate = mep.latestStats?.attendanceRate ?? 0
+        const matchesAttendance =
+          !attendanceRange ||
+          (attendanceRange === 'high' && rate >= 90) ||
+          (attendanceRange === 'medium' && rate >= 70 && rate < 90) ||
+          (attendanceRange === 'low' && rate < 70)
+
+        return (
+          matchesSearch && matchesParty && matchesGroup && matchesAttendance
+        )
       })
       .sort((a, b) => {
         if (sortBy === 'ranking') {
@@ -62,56 +94,54 @@ export const useFilterMEP = ({ initialList }: UseFilterMEPProps) => {
         return 0
       })
   }, [
-    debouncedSearchTerm,
+    debouncedSearch,
     initialList,
-    filters.nationalParty,
-    filters.epGroup,
+    nationalParty,
+    epGroup,
+    attendanceRange,
     sortBy,
   ])
 
   const hasActiveFilters =
-    filters.search !== '' ||
-    filters.nationalParty !== '' ||
-    filters.epGroup !== ''
+    searchInput !== '' ||
+    nationalParty !== '' ||
+    epGroup !== '' ||
+    attendanceRange !== ''
 
   const handleSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    setFilters((prev) => ({ ...prev, search: event.target.value }))
+    setSearchInput(event.target.value)
   }
 
   const handleNationalPartyChange = (value: string) => {
-    setFilters((prev) => ({
-      ...prev,
-      nationalParty: value === '__all__' ? '' : value,
-    }))
+    updateParam('party', value === '__all__' ? '' : value)
   }
 
   const handleEpGroupChange = (value: string) => {
-    setFilters((prev) => ({
-      ...prev,
-      epGroup: value === '__all__' ? '' : value,
-    }))
+    updateParam('group', value === '__all__' ? '' : value)
+  }
+
+  const handleAttendanceRangeChange = (value: string) => {
+    updateParam('attendance', value === '__all__' ? '' : value)
   }
 
   const handleSortBy = (key: string) => {
     if (key === 'ranking' || key === 'attendance' || key === 'name') {
-      setSortBy(key)
+      updateParam('sort', key === 'ranking' ? '' : key)
     }
   }
 
   const clearFilters = () => {
-    setFilters({
-      search: '',
-      nationalParty: '',
-      epGroup: '',
-    })
+    setSearchInput('')
+    router.replace(pathname)
   }
 
   return {
     filteredList,
     handleSearchChange,
-    filters,
+    filters: { search: searchInput, nationalParty, epGroup, attendanceRange },
     handleNationalPartyChange,
     handleEpGroupChange,
+    handleAttendanceRangeChange,
     hasActiveFilters,
     clearFilters,
     sortBy,

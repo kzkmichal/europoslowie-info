@@ -9,17 +9,28 @@ import {
 } from '@/components/ui/select'
 import { useRouter, usePathname, useSearchParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
+import { Input } from '../ui/input'
+import { useDebounce } from '@/hooks/useDebounce'
+import { useEffect, useState } from 'react'
 
 type VotesFilterProps = {
   year?: number
   month?: number
+  search?: string
   result?: 'ADOPTED' | 'REJECTED'
 }
 
-export const VotesFilter = ({ year, month, result }: VotesFilterProps) => {
+export const VotesFilter = ({
+  year,
+  month,
+  result,
+  search,
+}: VotesFilterProps) => {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
+  const [searchInput, setSearchInput] = useState(search ?? '')
+  const debouncedSearch = useDebounce(300, searchInput)
 
   const years = [2024, 2025, 2026]
   const months = [
@@ -37,7 +48,13 @@ export const VotesFilter = ({ year, month, result }: VotesFilterProps) => {
     { value: 12, label: 'Grudzień' },
   ]
 
-  const hasActiveFilters = !!(year || month || result)
+  const hasActiveFilters = !!(year || month || result || debouncedSearch)
+
+  useEffect(() => {
+    if ((debouncedSearch || undefined) !== search) {
+      updateFilters('search', debouncedSearch || '__all__')
+    }
+  }, [debouncedSearch])
 
   const updateFilters = (key: string, value: string) => {
     const params = new URLSearchParams(searchParams.toString())
@@ -52,11 +69,18 @@ export const VotesFilter = ({ year, month, result }: VotesFilterProps) => {
   }
 
   const clearFilters = () => {
+    setSearchInput('')
     router.push(`${pathname}`)
   }
 
   return (
     <div className="mb-6 flex flex-wrap items-center gap-3">
+      <Input
+        value={searchInput ?? ''}
+        onChange={(e) => setSearchInput(e.target.value)}
+        placeholder="Szukaj..."
+        className="w-full md:w-auto"
+      />
       <Select
         value={year ? `${year}` : '__all__'}
         onValueChange={(value) => updateFilters('year', value)}
