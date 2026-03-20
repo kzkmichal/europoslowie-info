@@ -99,6 +99,21 @@ class Vote(Base):
     mep = relationship('MEP', back_populates='votes')
 
 
+class VoteSource(Base):
+    """Source URL record for a vote (document, procedure file, press release)."""
+
+    __tablename__ = 'vote_sources'
+
+    id = Column(Integer, primary_key=True)
+    vote_number = Column('vote_number', String(50), nullable=False)
+    url = Column(Text, nullable=False)
+    name = Column(String(200), nullable=False)
+    source_type = Column('source_type', String(50), nullable=False)
+    # Allowed values: RCV_XML, VOT_XML, REPORT, PROCEDURE_OEIL, PRESS_RELEASE
+    accessed_at = Column('accessed_at', DateTime)
+    created_at = Column('created_at', DateTime, default=datetime.now)
+
+
 class MonthlyStats(Base):
     """Monthly statistics model."""
 

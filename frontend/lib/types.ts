@@ -124,6 +124,7 @@ export type MEPVote = {
   votesAbstain: number | null
   starsPoland: number | null
   sessionId: number
+  relatedCount?: number
 }
 
 /**
@@ -136,6 +137,18 @@ export type MEPVoteHistory = {
   page: number
   limit: number
   hasMore: boolean
+}
+
+/**
+ * One official EP source link for a vote
+ * Used by: getVoteSources() -> /glosowania/[voteNumber] page
+ */
+export type VoteSource = {
+  id: number
+  voteNumber: string
+  url: string
+  name: string
+  sourceType: string
 }
 
 /**
