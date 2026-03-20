@@ -13,6 +13,7 @@ import { EpGroupBreakdown } from '@/components/votes/EpGroupBreakdown'
 import { RelatedVotesList } from '@/components/votes/RelatedVotesList'
 import { MEPVoteList } from '@/components/votes/MEPVoteList'
 import { VoteSources } from '@/components/votes/VoteSources'
+import { VoteContext } from '@/components/votes/VoteContext'
 import type { Metadata } from 'next'
 import { cn } from '@/lib/utils'
 
@@ -189,11 +190,7 @@ export default async function VoteDetailsPage({ params }: PageParams) {
               </div>
             )}
           </div>
-          {contextAi && (
-            <div className="mt-4 rounded-lg bg-gray-50 p-4">
-              <p className="text-sm text-gray-700">{contextAi}</p>
-            </div>
-          )}
+          {contextAi && <VoteContext contextAi={contextAi} />}
         </div>
         <VoteSources sources={voteSources} />
         {relatedVotes.length > 0 && (

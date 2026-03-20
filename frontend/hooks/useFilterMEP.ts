@@ -1,25 +1,10 @@
 import { MEPWithStats } from '@/lib/types'
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter, usePathname, useSearchParams } from 'next/navigation'
+import { useDebounce } from './useDebounce'
 
 export type UseFilterMEPProps = {
   initialList?: MEPWithStats[]
-}
-
-export const useDebounce = (delay: number, value?: string) => {
-  const [debouncedValue, setDebouncedValue] = useState(value)
-
-  useEffect(() => {
-    const handler = setTimeout(() => {
-      setDebouncedValue(value)
-    }, delay)
-
-    return () => {
-      clearTimeout(handler)
-    }
-  }, [value, delay])
-
-  return debouncedValue
 }
 
 export const useFilterMEP = ({ initialList }: UseFilterMEPProps) => {

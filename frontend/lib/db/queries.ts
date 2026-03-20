@@ -284,7 +284,9 @@ export async function getMepVotes(
 
   const [totalResult, votesList] = await Promise.all([
     db
-      .select({ count: sql<number>`COUNT(DISTINCT (${votes.title}, ${votes.sessionId}))::int` })
+      .select({
+        count: sql<number>`COUNT(DISTINCT (${votes.title}, ${votes.sessionId}))::int`,
+      })
       .from(votes)
       .where(and(...conditions)),
 
@@ -370,9 +372,10 @@ export async function getVotesList(
     year?: number
     month?: number
     result?: 'ADOPTED' | 'REJECTED'
+    search?: string
   } = {},
 ): Promise<VotesList> {
-  const { page = 1, limit = 20, year, month, result } = options
+  const { page = 1, limit = 20, year, month, result, search } = options
   const offset = (page - 1) * limit
 
   const conditions = [eq(votes.isMain, true)]
@@ -389,6 +392,10 @@ export async function getVotesList(
     conditions.push(eq(votes.result, result))
   }
 
+  if (search) {
+    conditions.push(sql`${votes.title} ILIKE ${'%' + search + '%'}`)
+  }
+
   const whereClause = and(...conditions)
 
   // Priority filters for representative vote selection within each (title, session) group:
@@ -402,7 +409,9 @@ export async function getVotesList(
 
   const [totalResult, votesList] = await Promise.all([
     db
-      .select({ count: sql<number>`COUNT(DISTINCT (${votes.title}, ${votes.sessionId}))::int` })
+      .select({
+        count: sql<number>`COUNT(DISTINCT (${votes.title}, ${votes.sessionId}))::int`,
+      })
       .from(votes)
       .where(whereClause),
 
