@@ -1,9 +1,9 @@
 'use client'
 import { useMemo } from 'react'
 import { MEPWithStats } from '@/lib/types'
-import { MEPCard } from './MEPCard'
-import { Input } from './ui/input'
-import { Button } from './ui/button'
+import { MEPCard } from '@/components/meps/MEPCard'
+import { Input } from '@/components/ui/input'
+import { Button } from '@/components/ui/button'
 import { useFilterMEP } from '@/hooks/useFilterMEP'
 import {
   Select,
@@ -11,7 +11,7 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from './ui/select'
+} from '@/components/ui/select'
 
 type MEPSGridProps = {
   meps?: MEPWithStats[]

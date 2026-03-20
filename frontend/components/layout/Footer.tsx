@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { Container } from './Container'
+import { Container } from '@/components/layout/Container'
 import { cn } from '@/lib/utils'
 
 const footerLinkStyles = cn(

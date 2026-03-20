@@ -9,7 +9,7 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from './ui/select'
+} from '@/components/ui/select'
 
 export type VoteSessionNavProps = BaseProps & {
   sessions: MEPSessionSummary[]

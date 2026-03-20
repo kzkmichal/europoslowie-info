@@ -1,6 +1,6 @@
 import { getAllMEPsWithStats } from '@/lib/db/queries'
-import { Container } from '@/components/Container'
-import { MEPGrid } from '@/components/MEPGrid'
+import { Container } from '@/components/layout/Container'
+import { MEPGrid } from '@/components/meps/MEPGrid'
 
 export function generateMetadata() {
   const metadata = {

@@ -1,6 +1,6 @@
 import { getCurrentMonthTopVotes } from '@/lib/db/queries'
-import { Container } from '@/components/Container'
-import { VoteCard } from '@/components/VoteCard'
+import { Container } from '@/components/layout/Container'
+import { VoteCard } from '@/components/votes/VoteCard'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = {
