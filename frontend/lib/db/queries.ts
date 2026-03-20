@@ -284,7 +284,9 @@ export async function getMepVotes(
 
   const [totalResult, votesList] = await Promise.all([
     db
-      .select({ count: sql<number>`COUNT(DISTINCT (${votes.title}, ${votes.sessionId}))::int` })
+      .select({
+        count: sql<number>`COUNT(DISTINCT (${votes.title}, ${votes.sessionId}))::int`,
+      })
       .from(votes)
       .where(and(...conditions)),
 
@@ -402,7 +404,9 @@ export async function getVotesList(
 
   const [totalResult, votesList] = await Promise.all([
     db
-      .select({ count: sql<number>`COUNT(DISTINCT (${votes.title}, ${votes.sessionId}))::int` })
+      .select({
+        count: sql<number>`COUNT(DISTINCT (${votes.title}, ${votes.sessionId}))::int`,
+      })
       .from(votes)
       .where(whereClause),
 

@@ -651,7 +651,7 @@ class VotesScraper(BaseScraper):
             'Motyw ',       # recital vote: "Motyw E", "Motyw J/1"
             'motywie ',     # recital insertion: "Po motywie B", "Po motywie P"
             ' ust. ',       # paragraph vote (lowercase): "- ust. 2/2", "- ust. 7"
-            'Ust. ',        # paragraph vote (uppercase, as returned by EP API): "Ust. 4/1"
+            'Ust. ',        # paragraph vote (uppercase from EP API): "Ust. 4/1", "Ust. 6/2"
             'pkt ',         # point vote
             ' art. ',       # article vote
             'Załącznik',    # annex vote: "Załącznik, akapit pierwszy/2"
