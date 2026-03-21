@@ -2,12 +2,16 @@ import {
   getMepBySlug,
   getMepSessionList,
   getMepVotesBySession,
+  getMepQuestions,
+  getMepSpeeches,
 } from '@/lib/db/queries'
 import { notFound } from 'next/navigation'
 import { Container } from '@/components/layout/Container'
 import { StatsTable } from '@/components/meps/StatsTable'
 import { VoteCard } from '@/components/votes/VoteCard'
 import { CommitteeList } from '@/components/meps/CommitteeList'
+import { QuestionsList } from '@/components/meps/QuestionsList'
+import { SpeechesList } from '@/components/meps/SpeechesList'
 import type { Metadata } from 'next'
 import VoteSessionNav from '@/components/meps/VoteSessionNav'
 import { VoteRow } from '@/components/votes/VoteRow'
@@ -48,9 +52,11 @@ export default async function MEPProfilePage({
   const { session } = await searchParams
   const sessionId = session ? parseInt(session as string, 10) : undefined
 
-  const [mep, sessionList] = await Promise.all([
+  const [mep, sessionList, mepQuestions, mepSpeeches] = await Promise.all([
     getMepBySlug(slug),
     getMepSessionList(slug),
+    getMepQuestions(slug),
+    getMepSpeeches(slug),
   ])
 
   if (!mep) {
@@ -153,14 +159,38 @@ export default async function MEPProfilePage({
           </section>
         )}
         {mep.committees.length > 0 && (
-          <section>
+          <section className="mb-8">
             <h2 className="mb-4 text-2xl font-bold text-gray-900">Komisje</h2>
             <CommitteeList committees={mep.committees} />
+          </section>
+        )}
+        {mepQuestions.length > 0 && (
+          <section className="mb-8">
+            <h2 className="mb-4 text-2xl font-bold text-gray-900">
+              Pytania parlamentarne
+              <span className="ml-2 text-lg font-normal text-gray-500">
+                ({mepQuestions.length})
+              </span>
+            </h2>
+            <QuestionsList questions={mepQuestions} />
+          </section>
+        )}
+        {mepSpeeches.length > 0 && (
+          <section className="mb-8">
+            <h2 className="mb-4 text-2xl font-bold text-gray-900">
+              Przemówienia
+              <span className="ml-2 text-lg font-normal text-gray-500">
+                ({mepSpeeches.length})
+              </span>
+            </h2>
+            <SpeechesList speeches={mepSpeeches} />
           </section>
         )}
         {mep.monthlyStats.length === 0 &&
           mep.topVotes.length === 0 &&
           mep.committees.length === 0 &&
+          mepQuestions.length === 0 &&
+          mepSpeeches.length === 0 &&
           (!votes || votes.length === 0) && (
             <div className="rounded-lg border-2 border-dashed border-gray-300 p-12 text-center">
               <p className="text-gray-600">

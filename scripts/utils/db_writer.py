@@ -288,6 +288,184 @@ class DatabaseWriter:
             return mep_map
 
     @staticmethod
+    def get_all_mep_ep_ids() -> List[int]:
+        """
+        Return ep_id list for all active MEPs.
+
+        Returns:
+            List of EP numeric IDs
+        """
+        with get_db_session() as session:
+            result = session.execute(text("SELECT ep_id FROM meps WHERE is_active = true"))
+            return [row.ep_id for row in result]
+
+    @staticmethod
+    def upsert_questions(questions: List[Dict[str, Any]]) -> int:
+        """
+        Insert or update parliamentary questions.
+
+        Args:
+            questions: List of question dicts (must include mep_ep_id)
+
+        Returns:
+            Number of questions inserted/updated
+        """
+        if not questions:
+            logger.warning("No questions to insert")
+            return 0
+
+        mep_id_map = DatabaseWriter._get_mep_id_mapping()
+        count = 0
+        errors = 0
+
+        with get_db_session() as session:
+            for q in questions:
+                mep_id = mep_id_map.get(q.get('mep_ep_id'))
+                if not mep_id:
+                    logger.warning(f"MEP ep_id {q.get('mep_ep_id')} not found, skipping question")
+                    errors += 1
+                    continue
+
+                try:
+                    query = text("""
+                        INSERT INTO questions (
+                            mep_id, question_number, subject, question_text,
+                            addressed_to, date_submitted, date_answered, answered_by
+                        ) VALUES (
+                            :mep_id, :question_number, :subject, :question_text,
+                            :addressed_to, :date_submitted, :date_answered, :answered_by
+                        )
+                        ON CONFLICT (question_number) DO UPDATE SET
+                            mep_id = EXCLUDED.mep_id,
+                            subject = EXCLUDED.subject,
+                            question_text = EXCLUDED.question_text,
+                            addressed_to = EXCLUDED.addressed_to,
+                            date_submitted = EXCLUDED.date_submitted,
+                            date_answered = EXCLUDED.date_answered,
+                            answered_by = EXCLUDED.answered_by
+                    """)
+                    session.execute(query, {
+                        'mep_id': mep_id,
+                        'question_number': q['question_number'],
+                        'subject': q['subject'],
+                        'question_text': q['question_text'],
+                        'addressed_to': q['addressed_to'],
+                        'date_submitted': q['date_submitted'],
+                        'date_answered': q.get('date_answered'),
+                        'answered_by': q.get('answered_by'),
+                    })
+                    session.commit()
+                    count += 1
+                except Exception as e:
+                    session.rollback()
+                    errors += 1
+                    logger.error(f"Failed to insert question {q.get('question_number')}: {e}")
+
+        logger.info(f"✓ Inserted/updated {count} questions ({errors} failed)")
+        return count
+
+    @staticmethod
+    def upsert_speeches(speeches: List[Dict[str, Any]]) -> int:
+        """
+        Insert or update MEP speeches.
+
+        Args:
+            speeches: List of speech dicts (must include mep_ep_id)
+
+        Returns:
+            Number of speeches inserted/updated
+        """
+        if not speeches:
+            logger.warning("No speeches to insert")
+            return 0
+
+        mep_id_map = DatabaseWriter._get_mep_id_mapping()
+        count = 0
+        errors = 0
+
+        with get_db_session() as session:
+            for s in speeches:
+                mep_id = mep_id_map.get(s.get('mep_ep_id'))
+                if not mep_id:
+                    logger.warning(f"MEP ep_id {s.get('mep_ep_id')} not found, skipping speech")
+                    errors += 1
+                    continue
+
+                try:
+                    query = text("""
+                        INSERT INTO speeches (
+                            mep_id, ep_activity_id, debate_topic,
+                            speech_date, duration_seconds, transcript
+                        ) VALUES (
+                            :mep_id, :ep_activity_id, :debate_topic,
+                            :speech_date, :duration_seconds, :transcript
+                        )
+                        ON CONFLICT (ep_activity_id) DO UPDATE SET
+                            mep_id = EXCLUDED.mep_id,
+                            debate_topic = EXCLUDED.debate_topic,
+                            speech_date = EXCLUDED.speech_date,
+                            duration_seconds = EXCLUDED.duration_seconds,
+                            transcript = EXCLUDED.transcript
+                    """)
+                    session.execute(query, {
+                        'mep_id': mep_id,
+                        'ep_activity_id': s['ep_activity_id'],
+                        'debate_topic': s['debate_topic'],
+                        'speech_date': s['speech_date'],
+                        'duration_seconds': s.get('duration_seconds'),
+                        'transcript': s.get('transcript'),
+                    })
+
+                    count += 1
+                    if count % 500 == 0:
+                        session.commit()
+                        logger.info(f"  Inserted {count} speeches so far…")
+
+                except Exception as e:
+                    session.rollback()
+                    errors += 1
+                    logger.error(f"Failed to insert speech {s.get('ep_activity_id')}: {e}")
+
+            session.commit()
+
+        logger.info(f"✓ Inserted/updated {count} speeches ({errors} failed)")
+        return count
+
+    @staticmethod
+    def backfill_monthly_stats_counts() -> None:
+        """
+        Update questions_count and speeches_count in monthly_stats based on
+        actual data in the questions / speeches tables.
+        """
+        with get_db_session() as session:
+            try:
+                session.execute(text("""
+                    UPDATE monthly_stats ms
+                    SET questions_count = (
+                        SELECT COUNT(*)
+                        FROM questions q
+                        WHERE q.mep_id = ms.mep_id
+                          AND EXTRACT(YEAR  FROM q.date_submitted) = ms.year
+                          AND EXTRACT(MONTH FROM q.date_submitted) = ms.month
+                    )
+                """))
+                session.execute(text("""
+                    UPDATE monthly_stats ms
+                    SET speeches_count = (
+                        SELECT COUNT(*)
+                        FROM speeches s
+                        WHERE s.mep_id = ms.mep_id
+                          AND EXTRACT(YEAR  FROM s.speech_date) = ms.year
+                          AND EXTRACT(MONTH FROM s.speech_date) = ms.month
+                    )
+                """))
+                session.commit()
+                logger.info("✓ Backfilled questions_count and speeches_count in monthly_stats")
+            except Exception as e:
+                session.rollback()
+                logger.error(f"Failed to backfill monthly_stats counts: {e}")
+
+    @staticmethod
     def _find_mep_by_name(session, name: str) -> int:
         """
         Find MEP database ID by name (fuzzy matching).

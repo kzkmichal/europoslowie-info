@@ -6,6 +6,8 @@ import {
   votes,
   votingSessions,
   voteSources,
+  questions,
+  speeches,
 } from './schema'
 import { eq, desc, and, sql, count, max, min, asc } from 'drizzle-orm'
 import type {
@@ -21,7 +23,7 @@ import type {
   MEPVote,
   VoteSource,
 } from '../types'
-import type { Vote } from './schema'
+import type { Vote, Question, Speech } from './schema'
 
 export async function getAllMEPsWithStats(): Promise<MEPWithStats[]> {
   const allMeps = await db.select().from(meps).where(eq(meps.isActive, true))
@@ -736,6 +738,38 @@ export async function getMepVotesBySession(
     titleEn: v.titleEn ?? '',
     date: v.date ?? new Date(),
   }))
+}
+
+export async function getMepQuestions(slug: string): Promise<Question[]> {
+  const mep = await db
+    .select({ id: meps.id })
+    .from(meps)
+    .where(eq(meps.slug, slug))
+    .limit(1)
+
+  if (!mep[0]) return []
+
+  return db
+    .select()
+    .from(questions)
+    .where(eq(questions.mepId, mep[0].id))
+    .orderBy(desc(questions.dateSubmitted))
+}
+
+export async function getMepSpeeches(slug: string): Promise<Speech[]> {
+  const mep = await db
+    .select({ id: meps.id })
+    .from(meps)
+    .where(eq(meps.slug, slug))
+    .limit(1)
+
+  if (!mep[0]) return []
+
+  return db
+    .select()
+    .from(speeches)
+    .where(eq(speeches.mepId, mep[0].id))
+    .orderBy(desc(speeches.speechDate))
 }
 
 export async function getVoteSources(

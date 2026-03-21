@@ -138,6 +138,34 @@ class MonthlyStats(Base):
     votes4_star = Column('votes_poland_4star', Integer, default=0)
 
 
+class Question(Base):
+    """Parliamentary question model."""
+
+    __tablename__ = 'questions'
+
+    id = Column(Integer, primary_key=True)
+    mep_id = Column('mep_id', Integer, ForeignKey('meps.id'), nullable=False)
+    question_number = Column('question_number', String(50), nullable=False, unique=True)
+    question_text = Column('question_text', Text, nullable=False)
+    addressed_to = Column('addressed_to', String(255), nullable=False)
+    date_submitted = Column('date_submitted', Date, nullable=False)
+    date_answered = Column('date_answered', Date)
+    answered_by = Column('answered_by', String(255))
+
+
+class Speech(Base):
+    """MEP speech model."""
+
+    __tablename__ = 'speeches'
+
+    id = Column(Integer, primary_key=True)
+    mep_id = Column('mep_id', Integer, ForeignKey('meps.id'), nullable=False)
+    ep_activity_id = Column('ep_activity_id', String(150), unique=True)
+    debate_topic = Column('debate_topic', Text, nullable=False)
+    speech_date = Column('speech_date', Date, nullable=False)
+    duration_seconds = Column('duration_seconds', Integer)
+
+
 # Helper function to create tables
 def create_tables(db_url: str):
     """Create all tables in database."""
