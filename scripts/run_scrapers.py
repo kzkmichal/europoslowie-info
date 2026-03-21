@@ -28,6 +28,8 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from scripts.scrapers.meps import MEPsScraper
 from scripts.scrapers.sessions import VotingSessionsScraper
 from scripts.scrapers.votes import VotesScraper
+from scripts.scrapers.questions import QuestionsScraper
+from scripts.scrapers.speeches import SpeechesScraper
 from scripts.utils.db_writer import DatabaseWriter
 from scripts.utils.logger import setup_logger
 
@@ -68,6 +70,16 @@ def main():
         '--skip-votes',
         action='store_true',
         help='Skip votes scraping'
+    )
+    parser.add_argument(
+        '--skip-questions',
+        action='store_true',
+        help='Skip parliamentary questions scraping'
+    )
+    parser.add_argument(
+        '--skip-speeches',
+        action='store_true',
+        help='Skip speeches scraping'
     )
 
     args = parser.parse_args()
@@ -223,6 +235,76 @@ def main():
         else:
             logger.info("STEP 3/3: Skipping votes scraping (--skip-votes)")
             logger.info("")
+
+        # ====================================================================
+        # STEP 4: Scrape and insert parliamentary questions
+        # ====================================================================
+        if not args.skip_questions:
+            logger.info("STEP 4/5: Scraping parliamentary questions")
+            logger.info("-" * 70)
+
+            mep_ep_ids = set(DatabaseWriter.get_all_mep_ep_ids())
+            if not mep_ep_ids:
+                logger.warning("No MEPs in database, skipping questions scraping.")
+            else:
+                # Scrape current year and previous year to catch late-entered questions
+                years = list({now.year - 1, now.year})
+                if args.year:
+                    years = [args.year]
+
+                with QuestionsScraper() as questions_scraper:
+                    questions = questions_scraper.scrape(
+                        mep_ep_ids=mep_ep_ids,
+                        years=years,
+                    )
+                    valid_questions = questions_scraper.validate(questions)
+                    questions_scraper.print_summary()
+
+                    if valid_questions:
+                        inserted = DatabaseWriter.upsert_questions(valid_questions)
+                        logger.info(f"✓ Questions: {inserted} inserted/updated")
+                    else:
+                        logger.warning("No valid questions scraped")
+
+            logger.info("")
+        else:
+            logger.info("STEP 4/5: Skipping questions scraping (--skip-questions)")
+            logger.info("")
+
+        # ====================================================================
+        # STEP 5: Scrape and insert speeches
+        # ====================================================================
+        if not args.skip_speeches:
+            logger.info("STEP 5/5: Scraping speeches")
+            logger.info("-" * 70)
+
+            mep_ep_ids_list = DatabaseWriter.get_all_mep_ep_ids()
+            if not mep_ep_ids_list:
+                logger.warning("No MEPs in database, skipping speeches scraping.")
+            else:
+                with SpeechesScraper() as speeches_scraper:
+                    speeches = speeches_scraper.scrape(
+                        mep_ep_ids=mep_ep_ids_list,
+                        year=args.year if args.year else None,
+                    )
+                    valid_speeches = speeches_scraper.validate(speeches)
+                    speeches_scraper.print_summary()
+
+                    if valid_speeches:
+                        inserted = DatabaseWriter.upsert_speeches(valid_speeches)
+                        logger.info(f"✓ Speeches: {inserted} inserted/updated")
+                    else:
+                        logger.warning("No valid speeches scraped")
+
+            logger.info("")
+        else:
+            logger.info("STEP 5/5: Skipping speeches scraping (--skip-speeches)")
+            logger.info("")
+
+        # Backfill monthly_stats counts if any activity data was scraped
+        if not args.skip_questions or not args.skip_speeches:
+            logger.info("Backfilling monthly_stats counts…")
+            DatabaseWriter.backfill_monthly_stats_counts()
 
         # ====================================================================
         # FINAL SUMMARY

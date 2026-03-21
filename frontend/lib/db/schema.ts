@@ -120,6 +120,7 @@ export const questions = pgTable('questions', {
     .notNull()
     .references(() => meps.id),
   questionNumber: varchar('question_number', { length: 50 }).notNull().unique(),
+  subject: text('subject').notNull(),
   questionText: text('question_text').notNull(),
   addressedTo: varchar('addressed_to', { length: 255 }).notNull(),
   dateSubmitted: date('date_submitted', { mode: 'date' }).notNull(),
@@ -135,6 +136,7 @@ export const speeches = pgTable('speeches', {
   mepId: integer('mep_id')
     .notNull()
     .references(() => meps.id),
+  epActivityId: varchar('ep_activity_id', { length: 150 }).unique(),
   debateTopic: text('debate_topic').notNull(),
   speechDate: date('speech_date', { mode: 'date' }).notNull(),
   durationSeconds: integer('duration_seconds'),
