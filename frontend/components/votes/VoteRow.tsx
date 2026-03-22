@@ -1,6 +1,5 @@
 import { BaseProps, MEPVote } from '@/lib/types'
 import { cn } from '@/lib/utils'
-import React from 'react'
 
 type VoteRowProps = BaseProps & {
   vote: MEPVote
@@ -27,16 +26,7 @@ export const VoteRow = ({ vote }: VoteRowProps) => {
         {vote.voteChoice === 'ABSENT' && 'Nieobecny'}
       </div>
       <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-medium text-gray-900">
-          {vote.title}
-        </p>
-        <p className="text-xs text-gray-500">
-          {new Date(vote.date).toLocaleDateString('pl-PL', {
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric',
-          })}
-        </p>
+        <p className="text-sm font-medium text-gray-900">{vote.title}</p>
       </div>
       {vote.relatedCount != null && vote.relatedCount > 0 && (
         <span className="shrink-0 rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-500">

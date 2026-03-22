@@ -1,6 +1,6 @@
 # Project Progress
 
-Last updated: 2026-03-07
+Last updated: 2026-03-22
 
 ## ✅ Completed
 
@@ -60,20 +60,24 @@ Last updated: 2026-03-07
 - [x] `getEpGroupBreakdown(voteNumber)` — Polish MEPs breakdown by EP group
 - [x] `getMepSessionList(slug)` — lista sesji posła z mini-statystykami (tylko `is_main`)
 - [x] `getMepVotesBySession(slug, sessionId)` — głosowania posła per sesja (tylko `is_main`)
+- [x] `getMepMonthList(slug)` — lista miesięcy z głosowaniami MEP-a (year, month, voteCount, location)
+- [x] `getMepVotesByMonth(slug, year, month)` — głosowania posła per miesiąc z deduplication
+- [x] `getMepSpeechesBySession(slug, startDate, endDate)` — przemówienia w zakresie dat
+- [x] `getMepQuestionsBySession(slug, startDate, endDate)` — pytania w zakresie dat
 - [x] `getVotesList(options)` — strona listingowa głosowań (filtry: year/month/result, paginacja page/limit)
 
 #### Pages
-- [x] Homepage (`/`) — MEP grid with search/filter/sort
-- [x] MEP profile page (`/poslowie/[slug]`) — stats, nawigacja po sesjach, historia głosowań
+- [x] Homepage (`/`) — MEP grid with search/filter/sort; domyślny widok grupuje wg grupy EP z pełną nazwą; sortowanie po nazwisku
+- [x] MEP profile page (`/poslowie/[slug]`) — stats, nawigacja po miesiącach (?month=YYYY-MM), historia głosowań pogrupowana po dniach z podsumowaniem, przemówienia/pytania per miesiąc
 - [x] Votes listing page (`/glosowania`) — server-side filtering (year/month/result), paginacja, URL params, grupowanie po dacie
 - [x] Vote details page (`/glosowania/[voteNumber]`) — full breakdown
 - [x] Top votes page (`/top-glosowania`)
 - [x] Static pages (Metodologia, O Projekcie)
 
 #### Components — MEP profile page
-- [x] `VoteSessionNav` — nawigacja po sesjach: Select z historią + Poprzednia/Następna + info bar z mini-statystykami sesji
-- [x] `VoteRow` — pojedyncze głosowanie w historii (badge koloru, tytuł, link do szczegółów)
-- [x] `StatsTable` — tabela statystyk miesięcznych
+- [x] `VoteMonthNav` — nawigacja po miesiącach: Select (miesiąc + lokalizacja + liczba głosowań) + prev/next; URL param `?month=YYYY-MM`
+- [x] `VoteRow` — pojedyncze głosowanie w historii (badge koloru, pełny tytuł bez truncate, bez daty, link do szczegółów)
+- [x] `StatsTable` — tabela statystyk miesięcznych (kolumny Przemówienia/Pytania widoczne gdy dane > 0; format miesiąca "lut 2026"; bez kolumny Ranking)
 
 #### Components — Votes listing page
 - [x] `VotesFilter` (client component) — filtry server-side: rok/miesiąc/wynik, URL params, reset paginacji przy zmianie filtra
@@ -87,13 +91,13 @@ Last updated: 2026-03-07
 - [x] `dec_label` subtitle — pokazywany gdy `!isMain && decLabel`
 
 #### Components — Homepage
-- [x] `MEPGrid` (client component) — grid posłów z kontrolkami
-- [x] `MEPCard` — karta posła ze statystykami
+- [x] `MEPGrid` (client component) — grid posłów z kontrolkami; bez filtrów: grupowanie wg grupy EP (`GroupedMEPList`) z pełną nazwą (`EP_GROUP_FULL_NAMES`); z filtrami: płaska lista
+- [x] `MEPCard` — karta posła: etykieta obecności 🟢/🟡/🔴 (≥90%/70–89%/<70%), głosowania z nieob., miesiąc/rok statystyk, przemówienia/pytania gdy >0; "Top głosowanie" ukryte
 - [x] `useFilterMEP` hook — filtrowanie i sortowanie client-side
   - search po nazwisku (debounced 300ms)
   - filtr po `nationalParty`
   - filtr po `epGroup`
-  - sortowanie: ranking / frekwencja / nazwisko (`localeCompare 'pl'`)
+  - sortowanie: ranking / frekwencja / nazwisko (`localeCompare 'pl'`); domyślnie nazwisko
   - `clearFilters`, `hasActiveFilters`
 - [x] Licznik "Wyświetlono X z 53 posłów"
 - [x] Empty state przy braku wyników
@@ -103,6 +107,7 @@ Last updated: 2026-03-07
 - [x] `RelatedVote`, `EpGroupRow` (nowe typy)
 - [x] `VoteDetailsById` — rozszerzony o `decLabel`, `isMain`
 - [x] `MEPSessionSummary` — sesja z mini-statystykami głosowań posła
+- [x] `MEPMonthSummary` — miesiąc z liczbą głosowań i lokalizacją sesji
 - [x] `MEPVote` — rozszerzony o `sessionId`
 
 ## 🚧 In Progress

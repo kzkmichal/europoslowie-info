@@ -6,6 +6,11 @@ type StatsTableProps = BaseProps & {
   stats: MonthlyStats[]
 }
 
+const MONTHS_PL = [
+  'sty', 'lut', 'mar', 'kwi', 'maj', 'cze',
+  'lip', 'sie', 'wrz', 'paź', 'lis', 'gru',
+]
+
 export function StatsTable({
   stats,
   className,
@@ -18,6 +23,9 @@ export function StatsTable({
       <div className="text-sm text-gray-500">Brak danych statystycznych</div>
     )
   }
+
+  const hasSpeeches = stats.some((s) => (s.speechesCount ?? 0) > 0)
+  const hasQuestions = stats.some((s) => (s.questionsCount ?? 0) > 0)
 
   return (
     <div
@@ -39,19 +47,7 @@ export function StatsTable({
               scope="col"
               className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500"
             >
-              Ranking
-            </th>
-            <th
-              scope="col"
-              className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500"
-            >
               Obecność
-            </th>
-            <th
-              scope="col"
-              className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500"
-            >
-              Głosowania
             </th>
             <th
               scope="col"
@@ -75,24 +71,31 @@ export function StatsTable({
               scope="col"
               className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500"
             >
-              Nieobecny
+              Nieob.
             </th>
+            {hasSpeeches && (
+              <th
+                scope="col"
+                className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500"
+              >
+                Przemówienia
+              </th>
+            )}
+            {hasQuestions && (
+              <th
+                scope="col"
+                className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500"
+              >
+                Pytania
+              </th>
+            )}
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-200 bg-white">
           {stats.map((stat) => (
             <tr key={stat.id} className="hover:bg-gray-50">
               <td className="whitespace-nowrap px-6 py-4 text-sm font-medium text-gray-900">
-                {stat.month}/{stat.year}
-              </td>
-              <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-900">
-                {stat.rankingAmongPoles ? (
-                  <span className="font-semibold">
-                    #{stat.rankingAmongPoles}
-                  </span>
-                ) : (
-                  <span className="text-gray-400">N/A</span>
-                )}
+                {MONTHS_PL[stat.month - 1]} {stat.year}
               </td>
               <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-900">
                 <span
@@ -108,9 +111,6 @@ export function StatsTable({
                   {stat.attendanceRate.toFixed(1)}%
                 </span>
               </td>
-              <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-900">
-                {stat.totalVotes}
-              </td>
               <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-600">
                 {stat.votesFor}
               </td>
@@ -123,6 +123,16 @@ export function StatsTable({
               <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-600">
                 {stat.votesAbsent}
               </td>
+              {hasSpeeches && (
+                <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-600">
+                  {stat.speechesCount ?? 0}
+                </td>
+              )}
+              {hasQuestions && (
+                <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-600">
+                  {stat.questionsCount ?? 0}
+                </td>
+              )}
             </tr>
           ))}
         </tbody>

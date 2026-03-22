@@ -2,6 +2,59 @@
 import { useMemo } from 'react'
 import { MEPWithStats } from '@/lib/types'
 import { MEPCard } from '@/components/meps/MEPCard'
+
+const EP_GROUP_FULL_NAMES: Record<string, string> = {
+  EPP: 'Europejska Partia Ludowa',
+  'S&D': 'Socjaliści i Demokraci',
+  'Patriots for Europe': 'Patrioci dla Europy',
+  ECR: 'Europejscy Konserwatyści i Reformatorzy',
+  Renew: 'Odnówmy Europę',
+  'Renew Europe': 'Odnówmy Europę',
+  Greens: 'Zieloni / Wolne Przymierze Europejskie',
+  ESN: 'Europa Suwerennych Narodów',
+  NI: 'Niezrzeszeni',
+  Niezrzeszeni: 'Niezrzeszeni',
+}
+
+function GroupedMEPList({ meps }: { meps: MEPWithStats[] }) {
+  const groups = useMemo(() => {
+    const groupMap = new Map<string, MEPWithStats[]>()
+    for (const mep of meps) {
+      const group = mep.epGroup ?? 'Inne'
+      if (!groupMap.has(group)) groupMap.set(group, [])
+      groupMap.get(group)!.push(mep)
+    }
+    return [...groupMap.entries()].sort(([a], [b]) => a.localeCompare(b, 'pl'))
+  }, [meps])
+
+  return (
+    <div className="space-y-10">
+      {groups.map(([group, groupMeps]) => {
+        const fullName = EP_GROUP_FULL_NAMES[group]
+        return (
+          <section key={group}>
+            <div className="mb-4 border-b border-gray-200 pb-2">
+              <h2 className="text-lg font-semibold text-gray-800">
+                {group}
+                <span className="ml-2 text-sm font-normal text-gray-400">
+                  ({groupMeps.length})
+                </span>
+              </h2>
+              {fullName && fullName !== group && (
+                <p className="text-sm text-gray-500">{fullName}</p>
+              )}
+            </div>
+            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+              {groupMeps.map((mep) => (
+                <MEPCard key={mep.id} mep={mep} />
+              ))}
+            </div>
+          </section>
+        )
+      })}
+    </div>
+  )
+}
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { useFilterMEP } from '@/hooks/useFilterMEP'
@@ -138,12 +191,14 @@ export const MEPGrid = ({ meps }: MEPSGridProps) => {
         <div className="rounded-lg border-2 border-dashed border-gray-300 p-12 text-center">
           <p className="text-gray-600">Brak posłów spełniających kryteria</p>
         </div>
-      ) : (
+      ) : hasActiveFilters ? (
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {filteredList.map((mep) => (
             <MEPCard key={mep.id} mep={mep} />
           ))}
         </div>
+      ) : (
+        <GroupedMEPList meps={filteredList} />
       )}
     </>
   )
