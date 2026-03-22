@@ -9,6 +9,7 @@ type VoteCardVote = {
   date: Date | null
   result?: string | null
   starsPoland?: number | null
+  topicCategory?: string | null
 }
 
 type VoteCardProps = BaseProps & {
@@ -66,6 +67,13 @@ export function VoteCard({
           </div>
         )} */}
       </div>
+      {vote.topicCategory && (
+        <div className="mt-2">
+          <span className="inline-block rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700">
+            {vote.topicCategory}
+          </span>
+        </div>
+      )}
       {vote.result && (
         <div className="mt-2 text-xs">
           <span className="text-gray-600">Wynik: </span>

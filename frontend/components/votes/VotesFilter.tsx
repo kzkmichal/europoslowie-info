@@ -18,6 +18,8 @@ type VotesFilterProps = {
   month?: number
   search?: string
   result?: 'ADOPTED' | 'REJECTED'
+  topic?: string
+  topics?: string[]
 }
 
 export const VotesFilter = ({
@@ -25,6 +27,8 @@ export const VotesFilter = ({
   month,
   result,
   search,
+  topic,
+  topics = [],
 }: VotesFilterProps) => {
   const router = useRouter()
   const pathname = usePathname()
@@ -48,7 +52,7 @@ export const VotesFilter = ({
     { value: 12, label: 'Grudzień' },
   ]
 
-  const hasActiveFilters = !!(year || month || result || debouncedSearch)
+  const hasActiveFilters = !!(year || month || result || debouncedSearch || topic)
 
   useEffect(() => {
     if ((debouncedSearch || undefined) !== search) {
@@ -127,6 +131,24 @@ export const VotesFilter = ({
           <SelectItem value="REJECTED">Odrzucone</SelectItem>
         </SelectContent>
       </Select>
+      {topics.length > 0 && (
+        <Select
+          value={topic ?? '__all__'}
+          onValueChange={(value) => updateFilters('topic', value)}
+        >
+          <SelectTrigger className="w-52">
+            <SelectValue placeholder="Temat" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="__all__">Wszystkie tematy</SelectItem>
+            {topics.map((t) => (
+              <SelectItem key={t} value={t}>
+                {t}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      )}
       {hasActiveFilters && (
         <Button size="sm" variant="outline" onClick={clearFilters}>
           Wyczyść filtry

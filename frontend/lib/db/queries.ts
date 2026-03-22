@@ -367,6 +367,18 @@ export async function getMepVotes(
   }
 }
 
+export async function getTopicCategories(): Promise<string[]> {
+  const rows = await db
+    .selectDistinct({ topicCategory: votes.topicCategory })
+    .from(votes)
+    .where(sql`${votes.topicCategory} IS NOT NULL`)
+    .orderBy(asc(votes.topicCategory))
+
+  return rows
+    .map((r) => r.topicCategory)
+    .filter((t): t is string => t !== null)
+}
+
 export async function getVotesList(
   options: {
     page?: number
@@ -375,9 +387,10 @@ export async function getVotesList(
     month?: number
     result?: 'ADOPTED' | 'REJECTED'
     search?: string
+    topic?: string
   } = {},
 ): Promise<VotesList> {
-  const { page = 1, limit = 20, year, month, result, search } = options
+  const { page = 1, limit = 20, year, month, result, search, topic } = options
   const offset = (page - 1) * limit
 
   const conditions = [eq(votes.isMain, true)]
@@ -396,6 +409,10 @@ export async function getVotesList(
 
   if (search) {
     conditions.push(sql`${votes.title} ILIKE ${'%' + search + '%'}`)
+  }
+
+  if (topic) {
+    conditions.push(eq(votes.topicCategory, topic))
   }
 
   const whereClause = and(...conditions)
@@ -484,6 +501,7 @@ export async function getVotesList(
           MAX(${votes.polishVotesAbsent})
         )`,
         sessionId: votes.sessionId,
+        topicCategory: sql<string | null>`MAX(${votes.topicCategory})`,
       })
       .from(votes)
       .where(whereClause)

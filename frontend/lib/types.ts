@@ -239,6 +239,7 @@ export type VoteListItem = {
   polishVotesAbstain: number | null
   polishVotesAbsent: number | null
   sessionId: number
+  topicCategory: string | null
 }
 
 /**
