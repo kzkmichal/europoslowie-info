@@ -1,7 +1,7 @@
 import { Container } from '@/components/layout/Container'
 import { VoteCard } from '@/components/votes/VoteCard'
 import { VotesFilter } from '@/components/votes/VotesFilter'
-import { getVotesList } from '@/lib/db/queries'
+import { getVotesList, getTopicCategories } from '@/lib/db/queries'
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { Fragment } from 'react'
@@ -13,6 +13,7 @@ export type PageProps = {
     month: string
     result: string
     search: string
+    topic: string
   }>
 }
 
@@ -29,19 +30,24 @@ export default async function GlosowaniaPage({ searchParams }: PageProps) {
   const year = params?.year ? Number(params?.year) : undefined
   const month = year && params?.month ? Number(params?.month) : undefined
   const search = params?.search ? String(params?.search) : undefined
+  const topic = params?.topic ? String(params?.topic) : undefined
   const result =
     params?.result === 'ADOPTED' || params?.result === 'REJECTED'
       ? params?.result
       : undefined
 
-  const { votes, total, hasMore } = await getVotesList({
-    limit: 50,
-    page,
-    year,
-    month,
-    result,
-    search,
-  })
+  const [{ votes, total, hasMore }, topics] = await Promise.all([
+    getVotesList({
+      limit: 50,
+      page,
+      year,
+      month,
+      result,
+      search,
+      topic,
+    }),
+    getTopicCategories(),
+  ])
 
   const votesByDate = votes.reduce(
     (acc, vote) => {
@@ -62,6 +68,7 @@ export default async function GlosowaniaPage({ searchParams }: PageProps) {
       month: month ? String(month) : undefined,
       result: result || undefined,
       search: search || undefined,
+      topic: topic || undefined,
       ...overrides,
     }
     const params = new URLSearchParams(
@@ -86,6 +93,8 @@ export default async function GlosowaniaPage({ searchParams }: PageProps) {
           month={month}
           result={result}
           search={search}
+          topic={topic}
+          topics={topics}
         />
         {votes.length === 0 ? (
           <p className="text-gray-500">Brak głosowań do wyświetlenia.</p>

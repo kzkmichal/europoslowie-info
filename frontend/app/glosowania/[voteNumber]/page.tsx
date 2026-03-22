@@ -113,6 +113,7 @@ export default async function VoteDetailsPage({ params }: PageParams) {
     date,
     starsPoland,
     contextAi,
+    topicCategory,
     votesFor,
     votesAgainst,
     votesAbstain,
@@ -190,6 +191,13 @@ export default async function VoteDetailsPage({ params }: PageParams) {
               </div>
             )}
           </div>
+          {topicCategory && (
+            <div className="mt-3">
+              <span className="inline-block rounded-full bg-blue-50 px-3 py-1 text-sm font-medium text-blue-700">
+                {topicCategory}
+              </span>
+            </div>
+          )}
           {contextAi && <VoteContext contextAi={contextAi} />}
         </div>
         <VoteSources sources={voteSources} />
