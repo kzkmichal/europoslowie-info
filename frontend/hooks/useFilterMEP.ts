@@ -20,7 +20,7 @@ export const useFilterMEP = ({ initialList }: UseFilterMEPProps) => {
   const nationalParty = searchParams.get('party') ?? ''
   const epGroup = searchParams.get('group') ?? ''
   const attendanceRange = searchParams.get('attendance') ?? ''
-  const sortBy = (searchParams.get('sort') ?? 'ranking') as
+  const sortBy = (searchParams.get('sort') ?? 'name') as
     | 'ranking'
     | 'attendance'
     | 'name'
@@ -126,7 +126,7 @@ export const useFilterMEP = ({ initialList }: UseFilterMEPProps) => {
 
   const handleSortBy = (key: string) => {
     if (key === 'ranking' || key === 'attendance' || key === 'name') {
-      updateParam('sort', key === 'ranking' ? '' : key)
+      updateParam('sort', key === 'name' ? '' : key)
     }
   }
 

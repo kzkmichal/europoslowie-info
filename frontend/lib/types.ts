@@ -78,6 +78,13 @@ export type MEPSessionSummary = {
   votesAbsent: number
 }
 
+export type MEPMonthSummary = {
+  year: number
+  month: number
+  voteCount: number
+  location: string | null
+}
+
 /**
  * Vote with MEP info
  */

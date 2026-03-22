@@ -9,7 +9,7 @@ import {
   questions,
   speeches,
 } from './schema'
-import { eq, desc, and, sql, count, max, min, asc } from 'drizzle-orm'
+import { eq, desc, and, sql, count, max, min, asc, gte, lte } from 'drizzle-orm'
 import type {
   MEPWithStats,
   MEPProfile,
@@ -20,6 +20,7 @@ import type {
   RelatedVote,
   EpGroupRow,
   MEPSessionSummary,
+  MEPMonthSummary,
   MEPVote,
   VoteSource,
 } from '../types'
@@ -788,6 +789,180 @@ export async function getMepSpeeches(slug: string): Promise<Speech[]> {
     .from(speeches)
     .where(eq(speeches.mepId, mep[0].id))
     .orderBy(desc(speeches.speechDate))
+}
+
+export async function getMepMonthList(slug: string): Promise<MEPMonthSummary[]> {
+  const mep = await db
+    .select({ id: meps.id })
+    .from(meps)
+    .where(eq(meps.slug, slug))
+    .limit(1)
+
+  if (!mep[0]) return []
+
+  const rows = await db
+    .select({
+      year: sql<number>`EXTRACT(YEAR FROM ${votes.date})::int`,
+      month: sql<number>`EXTRACT(MONTH FROM ${votes.date})::int`,
+      voteCount: sql<number>`COUNT(DISTINCT ${votes.title})::int`,
+      location: sql<string | null>`MAX(${votingSessions.location})`,
+    })
+    .from(votes)
+    .innerJoin(votingSessions, eq(votes.sessionId, votingSessions.id))
+    .where(and(eq(votes.mepId, mep[0].id), eq(votes.isMain, true)))
+    .groupBy(
+      sql`EXTRACT(YEAR FROM ${votes.date})`,
+      sql`EXTRACT(MONTH FROM ${votes.date})`,
+    )
+    .orderBy(
+      desc(sql`EXTRACT(YEAR FROM ${votes.date})`),
+      desc(sql`EXTRACT(MONTH FROM ${votes.date})`),
+    )
+
+  return rows
+}
+
+export async function getMepVotesByMonth(
+  slug: string,
+  year: number,
+  month: number,
+): Promise<MEPVote[]> {
+  const mep = await db
+    .select({ id: meps.id })
+    .from(meps)
+    .where(eq(meps.slug, slug))
+    .limit(1)
+
+  if (!mep[0]) return []
+
+  const mepId = mep[0].id
+
+  const isFinal = sql`(${votes.decLabel} ILIKE '%całość tekstu%' OR ${votes.decLabel} ILIKE '%cały tekst%')`
+  const isProvisional = sql`${votes.decLabel} ILIKE '%Wstępne porozumienie%'`
+  const isRejection = sql`${votes.decLabel} ILIKE '%Wniosek o odrzucenie%'`
+
+  const votesList = await db
+    .select({
+      id: min(votes.id),
+      voteNumber: sql<string | null>`COALESCE(
+        MAX(${votes.voteNumber}) FILTER (WHERE ${isFinal}),
+        MAX(${votes.voteNumber}) FILTER (WHERE ${isProvisional}),
+        MAX(${votes.voteNumber}) FILTER (WHERE ${isRejection}),
+        MAX(${votes.voteNumber})
+      )`,
+      title: votes.title,
+      titleEn: max(votes.titleEn),
+      date: max(votes.date),
+      voteChoice: sql<string>`COALESCE(
+        MAX(${votes.voteChoice}) FILTER (WHERE ${isFinal}),
+        MAX(${votes.voteChoice}) FILTER (WHERE ${isProvisional}),
+        MAX(${votes.voteChoice}) FILTER (WHERE ${isRejection}),
+        (ARRAY_AGG(${votes.voteChoice} ORDER BY ${votes.voteNumber} DESC))[1]
+      )`,
+      result: sql<string | null>`COALESCE(
+        MAX(${votes.result}) FILTER (WHERE ${isFinal}),
+        MAX(${votes.result}) FILTER (WHERE ${isProvisional}),
+        MAX(${votes.result}) FILTER (WHERE ${isRejection}),
+        MAX(${votes.result})
+      )`,
+      votesFor: sql<number | null>`COALESCE(
+        MAX(${votes.votesFor}) FILTER (WHERE ${isFinal}),
+        MAX(${votes.votesFor}) FILTER (WHERE ${isProvisional}),
+        MAX(${votes.votesFor}) FILTER (WHERE ${isRejection}),
+        MAX(${votes.votesFor})
+      )`,
+      votesAgainst: sql<number | null>`COALESCE(
+        MAX(${votes.votesAgainst}) FILTER (WHERE ${isFinal}),
+        MAX(${votes.votesAgainst}) FILTER (WHERE ${isProvisional}),
+        MAX(${votes.votesAgainst}) FILTER (WHERE ${isRejection}),
+        MAX(${votes.votesAgainst})
+      )`,
+      votesAbstain: sql<number | null>`COALESCE(
+        MAX(${votes.votesAbstain}) FILTER (WHERE ${isFinal}),
+        MAX(${votes.votesAbstain}) FILTER (WHERE ${isProvisional}),
+        MAX(${votes.votesAbstain}) FILTER (WHERE ${isRejection}),
+        MAX(${votes.votesAbstain})
+      )`,
+      starsPoland: sql<number | null>`COALESCE(
+        MAX(${votes.starsPoland}) FILTER (WHERE ${isFinal}),
+        MAX(${votes.starsPoland}) FILTER (WHERE ${isProvisional}),
+        MAX(${votes.starsPoland}) FILTER (WHERE ${isRejection}),
+        MAX(${votes.starsPoland})
+      )`,
+      sessionId: votes.sessionId,
+      relatedCount: sql<number>`GREATEST(COUNT(*) - 1, 0)::int`,
+    })
+    .from(votes)
+    .where(
+      and(
+        eq(votes.mepId, mepId),
+        eq(votes.isMain, true),
+        sql`EXTRACT(YEAR FROM ${votes.date}) = ${year}`,
+        sql`EXTRACT(MONTH FROM ${votes.date}) = ${month}`,
+      ),
+    )
+    .groupBy(votes.title, votes.sessionId)
+    .orderBy(sql`MAX(${votes.voteNumber}) ASC`)
+
+  return votesList.map((v) => ({
+    ...v,
+    id: v.id ?? 0,
+    title: v.title ?? '',
+    titleEn: v.titleEn ?? '',
+    date: v.date ?? new Date(),
+  }))
+}
+
+export async function getMepSpeechesBySession(
+  slug: string,
+  startDate: Date,
+  endDate: Date,
+): Promise<Speech[]> {
+  const mep = await db
+    .select({ id: meps.id })
+    .from(meps)
+    .where(eq(meps.slug, slug))
+    .limit(1)
+
+  if (!mep[0]) return []
+
+  return db
+    .select()
+    .from(speeches)
+    .where(
+      and(
+        eq(speeches.mepId, mep[0].id),
+        gte(speeches.speechDate, startDate),
+        lte(speeches.speechDate, endDate),
+      ),
+    )
+    .orderBy(asc(speeches.speechDate))
+}
+
+export async function getMepQuestionsBySession(
+  slug: string,
+  startDate: Date,
+  endDate: Date,
+): Promise<Question[]> {
+  const mep = await db
+    .select({ id: meps.id })
+    .from(meps)
+    .where(eq(meps.slug, slug))
+    .limit(1)
+
+  if (!mep[0]) return []
+
+  return db
+    .select()
+    .from(questions)
+    .where(
+      and(
+        eq(questions.mepId, mep[0].id),
+        gte(questions.dateSubmitted, startDate),
+        lte(questions.dateSubmitted, endDate),
+      ),
+    )
+    .orderBy(asc(questions.dateSubmitted))
 }
 
 export async function getVoteSources(
