@@ -113,6 +113,7 @@ export default async function VoteDetailsPage({ params }: PageParams) {
     date,
     starsPoland,
     contextAi,
+    voteDescription,
     topicCategory,
     votesFor,
     votesAgainst,
@@ -198,7 +199,12 @@ export default async function VoteDetailsPage({ params }: PageParams) {
               </span>
             </div>
           )}
-          {contextAi && <VoteContext contextAi={contextAi} />}
+          {(voteDescription || contextAi) && (
+            <VoteContext
+              voteDescription={voteDescription}
+              contextAi={contextAi}
+            />
+          )}
         </div>
         <VoteSources sources={voteSources} />
         {relatedVotes.length > 0 && (

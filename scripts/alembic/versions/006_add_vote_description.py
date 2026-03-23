@@ -1,6 +1,7 @@
 """Add vote_description column to votes table.
 
-Stores AI-generated structured description for a vote (description, bullets, source_url).
+Stores AI-generated structured description of the vote (JSON) built from
+the OEIL Legislative Observatory summary page.
 
 Revision ID: 006
 Revises: 005
