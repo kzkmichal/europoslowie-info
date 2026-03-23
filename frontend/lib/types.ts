@@ -189,6 +189,7 @@ export type VoteDetailsById = {
   documentReference: string | null
   documentUrl: string | null
   contextAi: string | null
+  voteDescription: string | null
   topicCategory: string | null
   policyArea: string | null
   decLabel: string | null

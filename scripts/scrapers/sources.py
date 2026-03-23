@@ -354,6 +354,94 @@ class SourcesScraper(BaseScraper):
             'source_type': 'OEIL_SUMMARY',
         }
 
+    # ─────────────────────────────────────────────────────────────────────────
+    # Content fetch: Retrieve OEIL summary page text for AI processing
+    # ─────────────────────────────────────────────────────────────────────────
+
+    def fetch_oeil_summary_content(self, url: str) -> Optional[Dict[str, Any]]:
+        """
+        Fetch and parse an OEIL document-summary page.
+
+        Returns a dict with:
+            {
+                "title": str,
+                "body": str,   # concatenated paragraph text
+                "url": str,
+            }
+        or None on any failure (network, parse, or empty content).
+
+        The caller is responsible for respecting rate limits — BaseScraper's
+        http session adds a 2s delay between calls automatically.
+        """
+        from bs4 import BeautifulSoup
+
+        try:
+            response = self.http.get(
+                url,
+                headers={'Accept': 'text/html,application/xhtml+xml;q=0.9,*/*;q=0.8'},
+                timeout=30,
+            )
+            response.raise_for_status()
+        except Exception as e:
+            self.log_warning(f"Failed to fetch OEIL summary page {url}: {e}")
+            return None
+
+        try:
+            doc = BeautifulSoup(response.text, 'lxml')
+        except Exception as e:
+            self.log_warning(f"Failed to parse OEIL summary HTML {url}: {e}")
+            return None
+
+        # ── Extract title ─────────────────────────────────────────────────────
+        title = ''
+        title_tag = doc.select_one('h1') or doc.select_one('.ep-title')
+        if title_tag:
+            title = title_tag.get_text(separator=' ', strip=True)
+
+        # ── Extract body text from paragraphs ─────────────────────────────────
+        # OEIL summary pages use a .ep-generic-text or .ep_gridColumn main
+        # content area. Collect all <p> tags within main content regions,
+        # falling back to all <p> tags on the page if nothing specific found.
+        paragraphs = []
+
+        content_area = (
+            doc.select_one('.ep-generic-text')
+            or doc.select_one('.ep_gridColumn')
+            or doc.select_one('main')
+            or doc.select_one('article')
+        )
+        if content_area:
+            for p in content_area.select('p'):
+                text = p.get_text(separator=' ', strip=True)
+                if text:
+                    paragraphs.append(text)
+            # Also collect any <ul><li> bullet points in the content area
+            for li in content_area.select('li'):
+                text = li.get_text(separator=' ', strip=True)
+                if text:
+                    paragraphs.append(text)
+        else:
+            for p in doc.select('p'):
+                text = p.get_text(separator=' ', strip=True)
+                if text:
+                    paragraphs.append(text)
+
+        body = '\n'.join(paragraphs)
+
+        if not title and not body:
+            self.log_warning(f"No content extracted from OEIL summary page {url}")
+            return None
+
+        self.log_info(
+            f"Extracted OEIL summary: title={title[:60]!r} "
+            f"body_chars={len(body)}"
+        )
+        return {
+            'title': title,
+            'body': body,
+            'url': url,
+        }
+
     @staticmethod
     def extract_procedure_ref_from_url(oeil_url: str) -> Optional[str]:
         """

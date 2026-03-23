@@ -173,6 +173,7 @@ export async function getVoteDetails(
       documentReference: votes.documentReference,
       documentUrl: votes.documentUrl,
       contextAi: votes.contextAi,
+      voteDescription: votes.voteDescription,
       topicCategory: votes.topicCategory,
       policyArea: votes.policyArea,
       decLabel: votes.decLabel,
