@@ -538,6 +538,78 @@ class DatabaseWriter:
         return count
 
     @staticmethod
+    def upsert_committee_memberships(memberships: List[Dict[str, Any]]) -> int:
+        """
+        Insert or update committee memberships.
+
+        Conflict resolution: (mep_id, committee_code, from_date) — same MEP,
+        same committee, same start date is the same membership record.
+
+        Args:
+            memberships: List of membership dicts (must include mep_ep_id)
+
+        Returns:
+            Number of records inserted/updated
+        """
+        if not memberships:
+            logger.warning("No committee memberships to insert")
+            return 0
+
+        mep_id_map = DatabaseWriter._get_mep_id_mapping()
+        count = 0
+        errors = 0
+
+        with get_db_session() as session:
+            for m in memberships:
+                mep_id = mep_id_map.get(m.get('mep_ep_id'))
+                if not mep_id:
+                    logger.warning(
+                        f"MEP ep_id {m.get('mep_ep_id')} not found, skipping committee membership"
+                    )
+                    errors += 1
+                    continue
+
+                try:
+                    query = text("""
+                        INSERT INTO committee_memberships (
+                            mep_id, committee_name, committee_code,
+                            role, from_date, to_date, is_current
+                        ) VALUES (
+                            :mep_id, :committee_name, :committee_code,
+                            :role, :from_date, :to_date, :is_current
+                        )
+                        ON CONFLICT (mep_id, committee_code, from_date) DO UPDATE SET
+                            committee_name = EXCLUDED.committee_name,
+                            role = EXCLUDED.role,
+                            to_date = EXCLUDED.to_date,
+                            is_current = EXCLUDED.is_current,
+                            updated_at = NOW()
+                    """)
+                    session.execute(query, {
+                        'mep_id': mep_id,
+                        'committee_name': m['committee_name'],
+                        'committee_code': m['committee_code'],
+                        'role': m['role'],
+                        'from_date': m.get('from_date'),
+                        'to_date': m.get('to_date'),
+                        'is_current': m.get('is_current', True),
+                    })
+                    count += 1
+                    if count % 100 == 0:
+                        session.commit()
+                except Exception as e:
+                    session.rollback()
+                    errors += 1
+                    logger.error(
+                        f"Failed to insert committee membership for MEP {m.get('mep_ep_id')}: {e}"
+                    )
+
+            session.commit()
+
+        logger.info(f"✓ Inserted/updated {count} committee memberships ({errors} failed)")
+        return count
+
+    @staticmethod
     def _find_mep_by_name(session, name: str) -> int:
         """
         Find MEP database ID by name (fuzzy matching).

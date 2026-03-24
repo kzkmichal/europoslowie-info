@@ -46,17 +46,16 @@ export function CommitteeList({
               <span
                 className={cn(
                   'ml-4 rounded-full px-3 py-1 text-xs font-medium',
-                  committee.role === 'MEMBER' && 'bg-blue-100 text-blue-800',
-                  committee.role === 'CHAIR' && 'bg-purple-100 text-purple-800',
-                  committee.role === 'VICE_CHAIR' &&
-                    'bg-indigo-100 text-indigo-800',
-                  committee.role === 'SUBSTITUTE' && 'bg-gray-100 text-gray-800'
+                  committee.role === 'member' && 'bg-blue-100 text-blue-800',
+                  committee.role === 'chair' && 'bg-purple-100 text-purple-800',
+                  committee.role === 'vice-chair' && 'bg-indigo-100 text-indigo-800',
+                  committee.role === 'substitute' && 'bg-gray-100 text-gray-800',
                 )}
               >
-                {committee.role === 'MEMBER' && 'Członek'}
-                {committee.role === 'CHAIR' && 'Przewodniczący'}
-                {committee.role === 'VICE_CHAIR' && 'Wiceprzewodniczący'}
-                {committee.role === 'SUBSTITUTE' && 'Zastępca'}
+                {committee.role === 'member' && 'Członek'}
+                {committee.role === 'chair' && 'Przewodniczący'}
+                {committee.role === 'vice-chair' && 'Wiceprzewodniczący'}
+                {committee.role === 'substitute' && 'Zastępca'}
               </span>
             )}
           </div>
