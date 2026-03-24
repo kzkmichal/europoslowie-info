@@ -2,6 +2,7 @@ import { db } from './index'
 import {
   committeeMemberships,
   meps,
+  mepDocuments,
   monthlyStats,
   votes,
   votingSessions,
@@ -24,7 +25,7 @@ import type {
   MEPVote,
   VoteSource,
 } from '../types'
-import type { Vote, Question, Speech } from './schema'
+import type { Vote, Question, Speech, MepDocument } from './schema'
 
 export async function getAllMEPsWithStats(): Promise<MEPWithStats[]> {
   const allMeps = await db.select().from(meps).where(eq(meps.isActive, true))
@@ -998,4 +999,18 @@ export async function getVoteSources(
     name: r.name ?? '',
     sourceType: r.sourceType ?? '',
   }))
+}
+
+export async function getMepDocuments(slug: string): Promise<MepDocument[]> {
+  const mep = await db
+    .select({ id: meps.id })
+    .from(meps)
+    .where(eq(meps.slug, slug))
+    .limit(1)
+  if (!mep[0]) return []
+  return db
+    .select()
+    .from(mepDocuments)
+    .where(eq(mepDocuments.mepId, mep[0].id))
+    .orderBy(desc(mepDocuments.documentDate))
 }

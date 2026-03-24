@@ -335,8 +335,7 @@ class DatabaseWriter:
                             :mep_id, :question_number, :subject, :question_text,
                             :addressed_to, :date_submitted, :date_answered, :answered_by
                         )
-                        ON CONFLICT (question_number) DO UPDATE SET
-                            mep_id = EXCLUDED.mep_id,
+                        ON CONFLICT (mep_id, question_number) DO UPDATE SET
                             subject = EXCLUDED.subject,
                             question_text = EXCLUDED.question_text,
                             addressed_to = EXCLUDED.addressed_to,
@@ -464,6 +463,79 @@ class DatabaseWriter:
             except Exception as e:
                 session.rollback()
                 logger.error(f"Failed to backfill monthly_stats counts: {e}")
+
+    @staticmethod
+    def upsert_mep_documents(docs: List[Dict[str, Any]]) -> int:
+        """
+        Insert or update MEP plenary documents.
+
+        Args:
+            docs: List of document dicts (must include mep_ep_id)
+
+        Returns:
+            Number of documents inserted/updated
+        """
+        if not docs:
+            logger.warning("No documents to insert")
+            return 0
+
+        mep_id_map = DatabaseWriter._get_mep_id_mapping()
+        count = 0
+        errors = 0
+
+        with get_db_session() as session:
+            for doc in docs:
+                mep_id = mep_id_map.get(doc.get('mep_ep_id'))
+                if not mep_id:
+                    logger.warning(
+                        f"MEP ep_id {doc.get('mep_ep_id')} not found, skipping document"
+                    )
+                    errors += 1
+                    continue
+
+                try:
+                    query = text("""
+                        INSERT INTO mep_documents (
+                            mep_id, ep_document_id, document_type, title,
+                            document_date, role, committee, doc_url
+                        ) VALUES (
+                            :mep_id, :ep_document_id, :document_type, :title,
+                            :document_date, :role, :committee, :doc_url
+                        )
+                        ON CONFLICT (mep_id, ep_document_id) DO UPDATE SET
+                            document_type = EXCLUDED.document_type,
+                            title = EXCLUDED.title,
+                            document_date = EXCLUDED.document_date,
+                            role = EXCLUDED.role,
+                            committee = EXCLUDED.committee,
+                            doc_url = EXCLUDED.doc_url,
+                            updated_at = NOW()
+                    """)
+                    session.execute(query, {
+                        'mep_id': mep_id,
+                        'ep_document_id': doc['ep_document_id'],
+                        'document_type': doc['document_type'],
+                        'title': doc['title'],
+                        'document_date': doc.get('document_date'),
+                        'role': doc.get('role'),
+                        'committee': doc.get('committee'),
+                        'doc_url': doc['doc_url'],
+                    })
+                    count += 1
+                    if count % 100 == 0:
+                        session.commit()
+                        logger.info(f"  Inserted {count} documents so far…")
+                except Exception as e:
+                    session.rollback()
+                    errors += 1
+                    logger.error(
+                        f"Failed to insert document {doc.get('ep_document_id')}: {e}"
+                    )
+
+            session.commit()
+
+        logger.info(f"✓ Inserted/updated {count} documents ({errors} failed)")
+        return count
 
     @staticmethod
     def _find_mep_by_name(session, name: str) -> int:
