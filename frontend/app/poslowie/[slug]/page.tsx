@@ -16,6 +16,7 @@ import { CommitteeList } from '@/components/meps/CommitteeList'
 import { QuestionsList } from '@/components/meps/QuestionsList'
 import { SpeechesList } from '@/components/meps/SpeechesList'
 import { DocumentsList } from '@/components/meps/DocumentsList'
+import Image from 'next/image'
 import type { Metadata } from 'next'
 import VoteMonthNav from '@/components/meps/VoteMonthNav'
 import { VoteRow } from '@/components/votes/VoteRow'
@@ -123,10 +124,20 @@ export default async function MEPProfilePage({
       <Container>
         <div className="mb-8">
           <div className="flex items-start gap-6">
-            <div className="h-32 w-32 shrink-0 rounded-lg bg-gray-200">
-              <div className="flex h-full items-center justify-center text-4xl font-bold text-gray-400">
-                {mep.fullName.charAt(0)}
-              </div>
+            <div className="h-32 w-32 shrink-0 overflow-hidden rounded-lg bg-gray-200">
+              {mep.photoUrl ? (
+                <Image
+                  src={mep.photoUrl}
+                  alt={mep.fullName}
+                  width={128}
+                  height={128}
+                  className="h-full w-full object-cover"
+                />
+              ) : (
+                <div className="flex h-full items-center justify-center text-4xl font-bold text-gray-400">
+                  {mep.fullName.charAt(0)}
+                </div>
+              )}
             </div>
             <div className="flex-1">
               <h1 className="text-3xl font-bold text-gray-900">
@@ -145,6 +156,38 @@ export default async function MEPProfilePage({
                   </div>
                 )}
               </div>
+              {mep.committees.length > 0 && (
+                <div className="mt-3 space-y-1">
+                  {mep.committees.map((c) => (
+                    <div key={c.id} className="flex items-baseline gap-2 text-sm">
+                      <span className="shrink-0 rounded bg-gray-100 px-1.5 py-0.5 text-xs font-mono font-semibold text-gray-700">
+                        {c.committeeCode}
+                      </span>
+                      <span className="text-gray-800">{c.committeeName}</span>
+                      <span className="text-gray-400">·</span>
+                      <span className={
+                        c.role === 'chair' ? 'text-purple-700 font-medium' :
+                        c.role === 'vice-chair' ? 'text-indigo-700 font-medium' :
+                        c.role === 'substitute' ? 'text-gray-500' :
+                        'text-gray-600'
+                      }>
+                        {c.role === 'member' && 'Członek'}
+                        {c.role === 'chair' && 'Przewodniczący'}
+                        {c.role === 'vice-chair' && 'Wiceprzewodniczący'}
+                        {c.role === 'substitute' && 'Zastępca'}
+                      </span>
+                      {c.fromDate && (
+                        <>
+                          <span className="text-gray-400">·</span>
+                          <span className="text-xs text-gray-400">
+                            od {new Date(c.fromDate).toLocaleDateString('pl-PL', { month: 'long', year: 'numeric' })}
+                          </span>
+                        </>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
               {mep.monthlyStats.length > 0 &&
                 (() => {
                   const avgAttendance =

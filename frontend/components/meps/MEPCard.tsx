@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import Image from 'next/image'
 import type { MEPWithStats, BaseProps } from '@/lib/types'
 import { cn } from '@/lib/utils'
 
@@ -38,16 +39,33 @@ export function MEPCard({
       data-cc={dataCc}
       id={id}
     >
-      <div className="mb-4">
-        <h3 className="text-lg font-semibold text-gray-900">{mep.fullName}</h3>
-        <div className="mt-1 flex items-center gap-2 text-sm text-gray-600">
-          {mep.nationalParty && (
-            <>
-              <span className="font-medium">{mep.nationalParty}</span>
-              <span>•</span>
-            </>
+      <div className="mb-4 flex items-center gap-3">
+        <div className="h-12 w-12 shrink-0 overflow-hidden rounded-full bg-gray-200">
+          {mep.photoUrl ? (
+            <Image
+              src={mep.photoUrl}
+              alt={mep.fullName}
+              width={48}
+              height={48}
+              className="h-full w-full object-cover"
+            />
+          ) : (
+            <div className="flex h-full items-center justify-center text-lg font-bold text-gray-400">
+              {mep.fullName.charAt(0)}
+            </div>
           )}
-          {mep.epGroup && <span>{mep.epGroup}</span>}
+        </div>
+        <div>
+          <h3 className="text-lg font-semibold text-gray-900">{mep.fullName}</h3>
+          <div className="mt-1 flex items-center gap-2 text-sm text-gray-600">
+            {mep.nationalParty && (
+              <>
+                <span className="font-medium">{mep.nationalParty}</span>
+                <span>•</span>
+              </>
+            )}
+            {mep.epGroup && <span>{mep.epGroup}</span>}
+          </div>
         </div>
       </div>
       {stats ? (

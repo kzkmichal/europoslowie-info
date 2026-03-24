@@ -30,6 +30,7 @@ from scripts.scrapers.sessions import VotingSessionsScraper
 from scripts.scrapers.votes import VotesScraper
 from scripts.scrapers.questions import QuestionsScraper
 from scripts.scrapers.speeches import SpeechesScraper
+from scripts.scrapers.committees import CommitteesScraper
 from scripts.scrapers.plenary_docs import PlenaryDocsScraper
 from scripts.utils.db_writer import DatabaseWriter
 from scripts.utils.logger import setup_logger
@@ -87,6 +88,11 @@ def main():
         action='store_true',
         help='Skip plenary documents scraping'
     )
+    parser.add_argument(
+        '--skip-committees',
+        action='store_true',
+        help='Skip committee memberships scraping'
+    )
 
     args = parser.parse_args()
 
@@ -110,7 +116,7 @@ def main():
         # ====================================================================
         if not args.skip_meps:
             logger.info("")
-            logger.info("STEP 1/6: Scraping MEPs (Polish Members of European Parliament)")
+            logger.info("STEP 1/7: Scraping MEPs (Polish Members of European Parliament)")
             logger.info("-" * 70)
 
             with MEPsScraper() as meps_scraper:
@@ -136,14 +142,14 @@ def main():
                 logger.info(f"✓ MEPs: {inserted_count} inserted/updated")
                 logger.info("")
         else:
-            logger.info("STEP 1/6: Skipping MEPs scraping (--skip-meps)")
+            logger.info("STEP 1/7: Skipping MEPs scraping (--skip-meps)")
             logger.info("")
 
         # ====================================================================
         # STEP 2: Scrape and insert voting sessions
         # ====================================================================
         if not args.skip_sessions:
-            logger.info("STEP 2/6: Scraping voting sessions")
+            logger.info("STEP 2/7: Scraping voting sessions")
             logger.info("-" * 70)
 
             with VotingSessionsScraper() as sessions_scraper:
@@ -176,7 +182,7 @@ def main():
                 logger.info(f"✓ Sessions: {len(session_ids)} inserted/updated")
                 logger.info("")
         else:
-            logger.info("STEP 2/6: Skipping sessions scraping (--skip-sessions)")
+            logger.info("STEP 2/7: Skipping sessions scraping (--skip-sessions)")
             logger.info("")
 
             # Still need to get session IDs from database for votes
@@ -188,7 +194,7 @@ def main():
         # STEP 3: Scrape and insert votes
         # ====================================================================
         if not args.skip_votes:
-            logger.info("STEP 3/6: Scraping voting results")
+            logger.info("STEP 3/7: Scraping voting results")
             logger.info("-" * 70)
 
             if not session_ids:
@@ -239,14 +245,14 @@ def main():
                 logger.info(f"✓ Total votes: {total_votes_inserted} inserted")
                 logger.info("")
         else:
-            logger.info("STEP 3/6: Skipping votes scraping (--skip-votes)")
+            logger.info("STEP 3/7: Skipping votes scraping (--skip-votes)")
             logger.info("")
 
         # ====================================================================
         # STEP 4: Scrape and insert parliamentary questions
         # ====================================================================
         if not args.skip_questions:
-            logger.info("STEP 4/6: Scraping parliamentary questions")
+            logger.info("STEP 4/7: Scraping parliamentary questions")
             logger.info("-" * 70)
 
             mep_ep_ids = set(DatabaseWriter.get_all_mep_ep_ids())
@@ -274,14 +280,14 @@ def main():
 
             logger.info("")
         else:
-            logger.info("STEP 4/6: Skipping questions scraping (--skip-questions)")
+            logger.info("STEP 4/7: Skipping questions scraping (--skip-questions)")
             logger.info("")
 
         # ====================================================================
         # STEP 5: Scrape and insert speeches
         # ====================================================================
         if not args.skip_speeches:
-            logger.info("STEP 5/6: Scraping speeches")
+            logger.info("STEP 5/7: Scraping speeches")
             logger.info("-" * 70)
 
             mep_ep_ids_list = DatabaseWriter.get_all_mep_ep_ids()
@@ -304,14 +310,14 @@ def main():
 
             logger.info("")
         else:
-            logger.info("STEP 5/6: Skipping speeches scraping (--skip-speeches)")
+            logger.info("STEP 5/7: Skipping speeches scraping (--skip-speeches)")
             logger.info("")
 
         # ====================================================================
         # STEP 6: Scrape and insert plenary documents
         # ====================================================================
         if not args.skip_documents:
-            logger.info("STEP 6/6: Scraping plenary documents")
+            logger.info("STEP 6/7: Scraping plenary documents")
             logger.info("-" * 70)
 
             mep_ep_ids_list = DatabaseWriter.get_all_mep_ep_ids()
@@ -334,7 +340,34 @@ def main():
 
             logger.info("")
         else:
-            logger.info("STEP 6/6: Skipping plenary documents scraping (--skip-documents)")
+            logger.info("STEP 6/7: Skipping plenary documents scraping (--skip-documents)")
+            logger.info("")
+
+        # ====================================================================
+        # STEP 7: Scrape and insert committee memberships
+        # ====================================================================
+        if not args.skip_committees:
+            logger.info("STEP 7/7: Scraping committee memberships")
+            logger.info("-" * 70)
+
+            mep_ep_ids_list = DatabaseWriter.get_all_mep_ep_ids()
+            if not mep_ep_ids_list:
+                logger.warning("No MEPs in database, skipping committees scraping.")
+            else:
+                with CommitteesScraper() as committees_scraper:
+                    memberships = committees_scraper.scrape(mep_ep_ids=mep_ep_ids_list)
+                    valid_memberships = committees_scraper.validate(memberships)
+                    committees_scraper.print_summary()
+
+                    if valid_memberships:
+                        inserted = DatabaseWriter.upsert_committee_memberships(valid_memberships)
+                        logger.info(f"✓ Committee memberships: {inserted} inserted/updated")
+                    else:
+                        logger.warning("No valid committee memberships scraped")
+
+            logger.info("")
+        else:
+            logger.info("STEP 7/7: Skipping committee memberships scraping (--skip-committees)")
             logger.info("")
 
         # Backfill monthly_stats counts if any activity data was scraped

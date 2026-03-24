@@ -28,6 +28,17 @@ export const VoteRow = ({ vote }: VoteRowProps) => {
       <div className="min-w-0 flex-1">
         <p className="text-sm font-medium text-gray-900">{vote.title}</p>
       </div>
+      {vote.result && (
+        <span
+          className={cn(
+            'shrink-0 rounded-full px-2 py-0.5 text-xs font-medium',
+            vote.result === 'ADOPTED' && 'bg-green-50 text-green-700',
+            vote.result === 'REJECTED' && 'bg-red-50 text-red-700',
+          )}
+        >
+          {vote.result === 'ADOPTED' ? 'Przyjęto' : 'Odrzucono'}
+        </span>
+      )}
       {vote.relatedCount != null && vote.relatedCount > 0 && (
         <span className="shrink-0 rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-500">
           +{vote.relatedCount} głosowań
