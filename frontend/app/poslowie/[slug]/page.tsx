@@ -192,6 +192,16 @@ export default async function MEPProfilePage({
                           </div>
                         </div>
                       )}
+                      {mepDocs.length > 0 && (
+                        <div>
+                          <div className="text-xs text-gray-500">
+                            Dokumenty plenarne
+                          </div>
+                          <div className="text-lg font-bold text-gray-900">
+                            {mepDocs.length}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )
                 })()}

@@ -33,6 +33,9 @@ class QuestionsScraper(BaseScraper):
         """
         Scrape written questions for the given years, filtered to Polish MEPs.
 
+        Joint questions with multiple Polish co-authors produce one record per
+        Polish MEP so every co-author is properly attributed.
+
         Args:
             mep_ep_ids: Set of EP numeric IDs for all active Polish MEPs.
             years: List of calendar years to scrape.
@@ -55,13 +58,12 @@ class QuestionsScraper(BaseScraper):
             self.log_info(f"Phase 2 — fetching details for {year}…")
             count = 0
             for qid in ids:
-                question = self._fetch_question(qid, mep_ep_ids)
-                if question:
-                    all_questions.append(question)
-                    count += 1
+                questions = self._fetch_question(qid, mep_ep_ids)
+                all_questions.extend(questions)
+                count += len(questions)
                 self.stats['items_scraped'] += 1
 
-            self.log_info(f"  {count} questions kept for Polish MEPs in {year}")
+            self.log_info(f"  {count} question records kept for Polish MEPs in {year}")
 
         return all_questions
 
@@ -106,10 +108,10 @@ class QuestionsScraper(BaseScraper):
 
     def _fetch_question(
         self, qid: str, mep_ep_ids: Set[int]
-    ) -> Optional[Dict[str, Any]]:
+    ) -> List[Dict[str, Any]]:
         """
-        Fetch a single question's details. Return a dict if the creator is a
-        Polish MEP, otherwise None.
+        Fetch a single question's details. Returns one dict per Polish MEP
+        co-author found in the creator list (empty list if none).
         """
         url = f"{EP_API_BASE}/parliamentary-questions/{qid}"
         try:
@@ -117,44 +119,39 @@ class QuestionsScraper(BaseScraper):
             data = response.json()
         except Exception as e:
             self.log_error(f"Failed to fetch question {qid}: {e}")
-            return None
+            return []
 
         items = data.get('data', [])
         if not items:
-            return None
+            return []
 
         item = items[0]
 
-        # Resolve creator → first Polish MEP ep_id found among all co-authors
+        # Collect ALL Polish MEP ep_ids among co-authors
         creators = item.get('creator', [])
-        mep_ep_id = None
+        polish_authors: List[int] = []
         for creator in creators:
-            # creator is a string like "person/197694"
             creator_ref = creator if isinstance(creator, str) else creator.get('@id', '')
             if creator_ref.startswith('person/'):
                 try:
                     candidate = int(creator_ref.split('/')[1])
                 except (ValueError, IndexError):
                     continue
-                if candidate in mep_ep_ids:
-                    mep_ep_id = candidate
-                    break  # use first Polish MEP found
+                if candidate in mep_ep_ids and candidate not in polish_authors:
+                    polish_authors.append(candidate)
 
-        if mep_ep_id is None:
-            return None
+        if not polish_authors:
+            return []
 
-        # Resolve addressed_to
+        # Shared fields — resolved once per question
         addressed_to = self._resolve_addressed_to(item)
 
-        # Resolve question text (title of realizing document)
         question_text = self._resolve_question_text(item)
         if not question_text:
             question_text = item.get('label', {}).get('en', '') or qid
 
-        # Dates
         date_submitted = item.get('document_date') or item.get('date')
 
-        # Answer info
         date_answered = None
         answered_by = None
         answers = item.get('inverse_answers_to', [])
@@ -165,20 +162,25 @@ class QuestionsScraper(BaseScraper):
             if answer_creators:
                 ac = answer_creators[0]
                 ac_ref = ac if isinstance(ac, str) else ac.get('@id', '')
-                # strip "org/" prefix and look up display name
                 org_code = ac_ref.replace('org/', '')
                 answered_by = INSTITUTION_NAMES.get(org_code, org_code)
 
-        return {
-            'mep_ep_id': mep_ep_id,
-            'question_number': item.get('identifier', qid),
-            'subject': question_text,
-            'question_text': question_text,
-            'addressed_to': addressed_to,
-            'date_submitted': date_submitted,
-            'date_answered': date_answered,
-            'answered_by': answered_by,
-        }
+        identifier = item.get('identifier', qid)
+
+        # One record per Polish co-author
+        return [
+            {
+                'mep_ep_id': mep_ep_id,
+                'question_number': identifier,
+                'subject': question_text,
+                'question_text': question_text,
+                'addressed_to': addressed_to,
+                'date_submitted': date_submitted,
+                'date_answered': date_answered,
+                'answered_by': answered_by,
+            }
+            for mep_ep_id in polish_authors
+        ]
 
     def _resolve_addressed_to(self, item: dict) -> str:
         """Extract and map the addressee institution code to a display name."""

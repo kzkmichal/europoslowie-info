@@ -119,7 +119,7 @@ export const questions = pgTable('questions', {
   mepId: integer('mep_id')
     .notNull()
     .references(() => meps.id),
-  questionNumber: varchar('question_number', { length: 50 }).notNull().unique(),
+  questionNumber: varchar('question_number', { length: 100 }).notNull(),
   subject: text('subject').notNull(),
   questionText: text('question_text').notNull(),
   addressedTo: varchar('addressed_to', { length: 255 }).notNull(),

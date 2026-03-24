@@ -335,8 +335,7 @@ class DatabaseWriter:
                             :mep_id, :question_number, :subject, :question_text,
                             :addressed_to, :date_submitted, :date_answered, :answered_by
                         )
-                        ON CONFLICT (question_number) DO UPDATE SET
-                            mep_id = EXCLUDED.mep_id,
+                        ON CONFLICT (mep_id, question_number) DO UPDATE SET
                             subject = EXCLUDED.subject,
                             question_text = EXCLUDED.question_text,
                             addressed_to = EXCLUDED.addressed_to,
