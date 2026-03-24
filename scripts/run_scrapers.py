@@ -30,6 +30,7 @@ from scripts.scrapers.sessions import VotingSessionsScraper
 from scripts.scrapers.votes import VotesScraper
 from scripts.scrapers.questions import QuestionsScraper
 from scripts.scrapers.speeches import SpeechesScraper
+from scripts.scrapers.plenary_docs import PlenaryDocsScraper
 from scripts.utils.db_writer import DatabaseWriter
 from scripts.utils.logger import setup_logger
 
@@ -81,6 +82,11 @@ def main():
         action='store_true',
         help='Skip speeches scraping'
     )
+    parser.add_argument(
+        '--skip-documents',
+        action='store_true',
+        help='Skip plenary documents scraping'
+    )
 
     args = parser.parse_args()
 
@@ -104,7 +110,7 @@ def main():
         # ====================================================================
         if not args.skip_meps:
             logger.info("")
-            logger.info("STEP 1/3: Scraping MEPs (Polish Members of European Parliament)")
+            logger.info("STEP 1/6: Scraping MEPs (Polish Members of European Parliament)")
             logger.info("-" * 70)
 
             with MEPsScraper() as meps_scraper:
@@ -130,14 +136,14 @@ def main():
                 logger.info(f"✓ MEPs: {inserted_count} inserted/updated")
                 logger.info("")
         else:
-            logger.info("STEP 1/3: Skipping MEPs scraping (--skip-meps)")
+            logger.info("STEP 1/6: Skipping MEPs scraping (--skip-meps)")
             logger.info("")
 
         # ====================================================================
         # STEP 2: Scrape and insert voting sessions
         # ====================================================================
         if not args.skip_sessions:
-            logger.info("STEP 2/3: Scraping voting sessions")
+            logger.info("STEP 2/6: Scraping voting sessions")
             logger.info("-" * 70)
 
             with VotingSessionsScraper() as sessions_scraper:
@@ -170,7 +176,7 @@ def main():
                 logger.info(f"✓ Sessions: {len(session_ids)} inserted/updated")
                 logger.info("")
         else:
-            logger.info("STEP 2/3: Skipping sessions scraping (--skip-sessions)")
+            logger.info("STEP 2/6: Skipping sessions scraping (--skip-sessions)")
             logger.info("")
 
             # Still need to get session IDs from database for votes
@@ -182,7 +188,7 @@ def main():
         # STEP 3: Scrape and insert votes
         # ====================================================================
         if not args.skip_votes:
-            logger.info("STEP 3/3: Scraping voting results")
+            logger.info("STEP 3/6: Scraping voting results")
             logger.info("-" * 70)
 
             if not session_ids:
@@ -233,14 +239,14 @@ def main():
                 logger.info(f"✓ Total votes: {total_votes_inserted} inserted")
                 logger.info("")
         else:
-            logger.info("STEP 3/3: Skipping votes scraping (--skip-votes)")
+            logger.info("STEP 3/6: Skipping votes scraping (--skip-votes)")
             logger.info("")
 
         # ====================================================================
         # STEP 4: Scrape and insert parliamentary questions
         # ====================================================================
         if not args.skip_questions:
-            logger.info("STEP 4/5: Scraping parliamentary questions")
+            logger.info("STEP 4/6: Scraping parliamentary questions")
             logger.info("-" * 70)
 
             mep_ep_ids = set(DatabaseWriter.get_all_mep_ep_ids())
@@ -268,14 +274,14 @@ def main():
 
             logger.info("")
         else:
-            logger.info("STEP 4/5: Skipping questions scraping (--skip-questions)")
+            logger.info("STEP 4/6: Skipping questions scraping (--skip-questions)")
             logger.info("")
 
         # ====================================================================
         # STEP 5: Scrape and insert speeches
         # ====================================================================
         if not args.skip_speeches:
-            logger.info("STEP 5/5: Scraping speeches")
+            logger.info("STEP 5/6: Scraping speeches")
             logger.info("-" * 70)
 
             mep_ep_ids_list = DatabaseWriter.get_all_mep_ep_ids()
@@ -298,7 +304,37 @@ def main():
 
             logger.info("")
         else:
-            logger.info("STEP 5/5: Skipping speeches scraping (--skip-speeches)")
+            logger.info("STEP 5/6: Skipping speeches scraping (--skip-speeches)")
+            logger.info("")
+
+        # ====================================================================
+        # STEP 6: Scrape and insert plenary documents
+        # ====================================================================
+        if not args.skip_documents:
+            logger.info("STEP 6/6: Scraping plenary documents")
+            logger.info("-" * 70)
+
+            mep_ep_ids_list = DatabaseWriter.get_all_mep_ep_ids()
+            if not mep_ep_ids_list:
+                logger.warning("No MEPs in database, skipping documents scraping.")
+            else:
+                with PlenaryDocsScraper() as docs_scraper:
+                    docs = docs_scraper.scrape(
+                        mep_ep_ids=mep_ep_ids_list,
+                        years=[year] if args.year else None,
+                    )
+                    valid_docs = docs_scraper.validate(docs)
+                    docs_scraper.print_summary()
+
+                    if valid_docs:
+                        inserted = DatabaseWriter.upsert_mep_documents(valid_docs)
+                        logger.info(f"✓ Documents: {inserted} inserted/updated")
+                    else:
+                        logger.warning("No valid documents scraped")
+
+            logger.info("")
+        else:
+            logger.info("STEP 6/6: Skipping plenary documents scraping (--skip-documents)")
             logger.info("")
 
         # Backfill monthly_stats counts if any activity data was scraped

@@ -6,6 +6,7 @@ import {
   getMepSpeeches,
   getMepSpeechesBySession,
   getMepQuestionsBySession,
+  getMepDocuments,
 } from '@/lib/db/queries'
 import { notFound } from 'next/navigation'
 import { Container } from '@/components/layout/Container'
@@ -14,6 +15,7 @@ import { VoteCard } from '@/components/votes/VoteCard'
 import { CommitteeList } from '@/components/meps/CommitteeList'
 import { QuestionsList } from '@/components/meps/QuestionsList'
 import { SpeechesList } from '@/components/meps/SpeechesList'
+import { DocumentsList } from '@/components/meps/DocumentsList'
 import type { Metadata } from 'next'
 import VoteMonthNav from '@/components/meps/VoteMonthNav'
 import { VoteRow } from '@/components/votes/VoteRow'
@@ -82,11 +84,12 @@ export default async function MEPProfilePage({
   const { month } = await searchParams
   const monthParam = typeof month === 'string' ? month : undefined
 
-  const [mep, monthList, mepQuestions, mepSpeeches] = await Promise.all([
+  const [mep, monthList, mepQuestions, mepSpeeches, mepDocs] = await Promise.all([
     getMepBySlug(slug),
     getMepMonthList(slug),
     getMepQuestions(slug),
     getMepSpeeches(slug),
+    getMepDocuments(slug),
   ])
 
   if (!mep) {
@@ -319,6 +322,17 @@ export default async function MEPProfilePage({
           <section className="mb-8">
             <h2 className="mb-4 text-2xl font-bold text-gray-900">Komisje</h2>
             <CommitteeList committees={mep.committees} />
+          </section>
+        )}
+        {mepDocs.length > 0 && (
+          <section className="mb-8">
+            <h2 className="mb-4 text-xl font-semibold text-gray-900">
+              Dokumenty plenarne
+              <span className="ml-2 text-base font-normal text-gray-500">
+                ({mepDocs.length})
+              </span>
+            </h2>
+            <DocumentsList documents={mepDocs} />
           </section>
         )}
         {mep.monthlyStats.length === 0 &&

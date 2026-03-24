@@ -168,6 +168,20 @@ export const voteSources = pgTable('vote_sources', {
   createdAt: timestamp('created_at').defaultNow(),
 })
 
+export const mepDocuments = pgTable('mep_documents', {
+  id: serial('id').primaryKey(),
+  mepId: integer('mep_id').notNull().references(() => meps.id),
+  epDocumentId: varchar('ep_document_id', { length: 100 }).notNull(),
+  documentType: varchar('document_type', { length: 30 }).notNull(),
+  title: text('title').notNull(),
+  documentDate: date('document_date', { mode: 'date' }),
+  role: varchar('role', { length: 20 }),
+  committee: varchar('committee', { length: 20 }),
+  docUrl: text('doc_url').notNull(),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+})
+
 export const committeeMemberships = pgTable('committee_memberships', {
   id: serial('id').primaryKey(),
   mepId: integer('mep_id')
@@ -187,6 +201,7 @@ export const mepsRelations = relations(meps, ({ many }) => ({
   questions: many(questions),
   speeches: many(speeches),
   committeeMemberships: many(committeeMemberships),
+  mepDocuments: many(mepDocuments),
 }))
 
 export const monthlyStatsRelations = relations(monthlyStats, ({ one }) => ({
@@ -230,6 +245,13 @@ export const committeeMembershipsRelations = relations(
   })
 )
 
+export const mepDocumentsRelations = relations(mepDocuments, ({ one }) => ({
+  mep: one(meps, {
+    fields: [mepDocuments.mepId],
+    references: [meps.id],
+  }),
+}))
+
 export type MEP = typeof meps.$inferSelect
 export type MonthlyStats = typeof monthlyStats.$inferSelect
 export type Vote = typeof votes.$inferSelect
@@ -245,3 +267,4 @@ export type InsertVotingSession = typeof votingSessions.$inferInsert
 export type InsertCommitteeMembership = typeof committeeMemberships.$inferInsert
 export type InsertQuestion = typeof questions.$inferInsert
 export type InsertSpeech = typeof speeches.$inferInsert
+export type MepDocument = typeof mepDocuments.$inferSelect
