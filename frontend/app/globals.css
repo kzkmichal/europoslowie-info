@@ -59,10 +59,17 @@
   --color-on-error: var(--on-error);
   --color-on-error-container: var(--on-error-container);
 
-  /* Tertiary — for neutral/abstained states */
+  /* Tertiary — warm orange for abstained states */
   --color-tertiary: var(--tertiary);
+  --color-tertiary-container: var(--tertiary-container);
+  --color-on-tertiary-container: var(--on-tertiary-container);
   --color-tertiary-fixed: var(--tertiary-fixed);
+  --color-tertiary-fixed-dim: var(--tertiary-fixed-dim);
   --color-on-tertiary-fixed-variant: var(--on-tertiary-fixed-variant);
+  --color-on-tertiary: var(--on-tertiary);
+
+  /* Surface variant */
+  --color-surface-variant: var(--surface-variant);
 
   /* Sidebar */
   --color-sidebar-ring: var(--sidebar-ring);
@@ -103,15 +110,15 @@
   /* === Primary — Deep Navy === */
   --primary: #00193c;
   --primary-foreground: #ffffff;
-  --primary-container: #1a3a6b;
-  --on-primary-container: #d0e4ff;
+  --primary-container: #002d62;
+  --on-primary-container: #7796d1;
 
   /* === Secondary — Slate Blue === */
   --secondary: #4c5e84;
   --secondary-foreground: #ffffff;
-  --secondary-container: #d9e2f8;
-  --on-secondary-container: #0e1b36;
-  --secondary-fixed-dim: #b9c8e8;
+  --secondary-container: #c2d4ff;
+  --on-secondary-container: #495b81;
+  --secondary-fixed-dim: #b4c6f1;
 
   /* === Surface hierarchy === */
   --surface: #fafbfe;
@@ -136,10 +143,17 @@
   --on-error: #ffffff;
   --on-error-container: #410002;
 
-  /* === Tertiary — muted purple for abstained/neutral === */
-  --tertiary: #5b6097;
-  --tertiary-fixed: #e1e0ff;
-  --on-tertiary-fixed-variant: #3d4278;
+  /* === Tertiary — warm orange for abstained/neutral === */
+  --tertiary: #330e00;
+  --tertiary-container: #541d02;
+  --on-tertiary-container: #d4815d;
+  --tertiary-fixed: #ffdbcd;
+  --tertiary-fixed-dim: #ffb597;
+  --on-tertiary-fixed-variant: #743417;
+
+  /* === Surface variant === */
+  --surface-variant: #e1e3e4;
+  --on-tertiary: #ffffff;
 
   /* === Shadcn compat === */
   --card: #ffffff;
