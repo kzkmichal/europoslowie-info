@@ -124,7 +124,7 @@ export default async function MEPProfilePage({
       <Container>
         <div className="mb-8">
           <div className="flex items-start gap-6">
-            <div className="h-32 w-32 shrink-0 overflow-hidden rounded-lg bg-gray-200">
+            <div className="h-32 w-32 shrink-0 overflow-hidden rounded-lg bg-surface-container-high">
               {mep.photoUrl ? (
                 <Image
                   src={mep.photoUrl}
@@ -134,16 +134,16 @@ export default async function MEPProfilePage({
                   className="h-full w-full object-cover"
                 />
               ) : (
-                <div className="flex h-full items-center justify-center text-4xl font-bold text-gray-400">
+                <div className="flex h-full items-center justify-center text-4xl font-bold text-on-surface-variant">
                   {mep.fullName.charAt(0)}
                 </div>
               )}
             </div>
             <div className="flex-1">
-              <h1 className="text-3xl font-bold text-gray-900">
+              <h1 className="font-display text-3xl font-bold text-on-surface">
                 {mep.fullName}
               </h1>
-              <div className="mt-2 flex flex-wrap gap-4 text-sm text-gray-600">
+              <div className="mt-2 flex flex-wrap gap-4 text-sm text-on-surface-variant">
                 {mep.nationalParty && (
                   <div>
                     <span className="font-medium">Partia krajowa:</span>{' '}
@@ -160,16 +160,16 @@ export default async function MEPProfilePage({
                 <div className="mt-3 space-y-1">
                   {mep.committees.map((c) => (
                     <div key={c.id} className="flex items-baseline gap-2 text-sm">
-                      <span className="shrink-0 rounded bg-gray-100 px-1.5 py-0.5 text-xs font-mono font-semibold text-gray-700">
+                      <span className="shrink-0 rounded bg-surface-container-high px-1.5 py-0.5 text-xs font-mono font-semibold text-on-surface-variant">
                         {c.committeeCode}
                       </span>
-                      <span className="text-gray-800">{c.committeeName}</span>
-                      <span className="text-gray-400">·</span>
+                      <span className="text-on-surface">{c.committeeName}</span>
+                      <span className="text-outline-variant">·</span>
                       <span className={
-                        c.role === 'chair' ? 'text-purple-700 font-medium' :
-                        c.role === 'vice-chair' ? 'text-indigo-700 font-medium' :
-                        c.role === 'substitute' ? 'text-gray-500' :
-                        'text-gray-600'
+                        c.role === 'chair' ? 'text-tertiary font-medium' :
+                        c.role === 'vice-chair' ? 'text-secondary font-medium' :
+                        c.role === 'substitute' ? 'text-outline' :
+                        'text-on-surface-variant'
                       }>
                         {c.role === 'member' && 'Członek'}
                         {c.role === 'chair' && 'Przewodniczący'}
@@ -178,8 +178,8 @@ export default async function MEPProfilePage({
                       </span>
                       {c.fromDate && (
                         <>
-                          <span className="text-gray-400">·</span>
-                          <span className="text-xs text-gray-400">
+                          <span className="text-outline-variant">·</span>
+                          <span className="text-xs text-outline">
                             od {new Date(c.fromDate).toLocaleDateString('pl-PL', { month: 'long', year: 'numeric' })}
                           </span>
                         </>
@@ -200,47 +200,47 @@ export default async function MEPProfilePage({
                   return (
                     <div className="mt-4 grid grid-cols-2 gap-x-8 gap-y-2 sm:flex sm:flex-wrap sm:gap-8">
                       <div>
-                        <div className="text-xs text-gray-500">
+                        <div className="text-xs text-outline">
                           Śr. obecność
                         </div>
-                        <div className="text-lg font-bold text-gray-900">
+                        <div className="font-display text-lg font-bold text-on-surface">
                           {avgAttendance.toFixed(1)}%
                         </div>
                       </div>
                       <div>
-                        <div className="text-xs text-gray-500">
+                        <div className="text-xs text-outline">
                           Głosowań łącznie
                         </div>
-                        <div className="text-lg font-bold text-gray-900">
+                        <div className="font-display text-lg font-bold text-on-surface">
                           {totalVotes}
                         </div>
                       </div>
                       {mepSpeeches.length > 0 && (
                         <div>
-                          <div className="text-xs text-gray-500">
+                          <div className="text-xs text-outline">
                             Przemówienia
                           </div>
-                          <div className="text-lg font-bold text-gray-900">
+                          <div className="font-display text-lg font-bold text-on-surface">
                             {mepSpeeches.length}
                           </div>
                         </div>
                       )}
                       {mepQuestions.length > 0 && (
                         <div>
-                          <div className="text-xs text-gray-500">
+                          <div className="text-xs text-outline">
                             Pytania parl.
                           </div>
-                          <div className="text-lg font-bold text-gray-900">
+                          <div className="font-display text-lg font-bold text-on-surface">
                             {mepQuestions.length}
                           </div>
                         </div>
                       )}
                       {mepDocs.length > 0 && (
                         <div>
-                          <div className="text-xs text-gray-500">
+                          <div className="text-xs text-outline">
                             Dokumenty plenarne
                           </div>
-                          <div className="text-lg font-bold text-gray-900">
+                          <div className="font-display text-lg font-bold text-on-surface">
                             {mepDocs.length}
                           </div>
                         </div>
@@ -253,7 +253,7 @@ export default async function MEPProfilePage({
         </div>
         {mep.monthlyStats.length > 0 && (
           <section className="mb-8">
-            <h2 className="mb-4 text-2xl font-bold text-gray-900">
+            <h2 className="font-display mb-4 text-2xl font-bold text-on-surface">
               Statystyki miesięczne
             </h2>
             <StatsTable stats={mep.monthlyStats} />
@@ -261,7 +261,7 @@ export default async function MEPProfilePage({
         )}
         {mep.topVotes.length > 0 && (
           <section className="mb-8">
-            <h2 className="mb-4 text-2xl font-bold text-gray-900">
+            <h2 className="font-display mb-4 text-2xl font-bold text-on-surface">
               Najważniejsze głosowania
             </h2>
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -297,12 +297,12 @@ export default async function MEPProfilePage({
               return (
                 <div key={dateKey}>
                   <div className="mb-2 flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                    <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">
+                    <h3 className="text-xs font-semibold text-outline uppercase tracking-widest">
                       {dayLabel}
                     </h3>
-                    <span className="text-xs text-gray-400">
+                    <span className="text-xs text-outline">
                       {forCount > 0 && (
-                        <span className="text-green-600 font-medium">
+                        <span className="text-secondary font-medium">
                           {forCount} za
                         </span>
                       )}
@@ -312,7 +312,7 @@ export default async function MEPProfilePage({
                           absentCount > 0) &&
                         ' · '}
                       {againstCount > 0 && (
-                        <span className="text-red-600 font-medium">
+                        <span className="text-error font-medium">
                           {againstCount} przeciw
                         </span>
                       )}
@@ -320,13 +320,13 @@ export default async function MEPProfilePage({
                         (abstainCount > 0 || absentCount > 0) &&
                         ' · '}
                       {abstainCount > 0 && (
-                        <span className="text-yellow-600 font-medium">
+                        <span className="text-tertiary font-medium">
                           {abstainCount} wstrz.
                         </span>
                       )}
                       {abstainCount > 0 && absentCount > 0 && ' · '}
                       {absentCount > 0 && (
-                        <span className="text-gray-400 font-medium">
+                        <span className="text-outline font-medium">
                           {absentCount} nieob.
                         </span>
                       )}
@@ -343,7 +343,7 @@ export default async function MEPProfilePage({
           </section>
         ) : (
           monthList.length > 0 && (
-            <p className="mb-8 text-sm text-gray-500">
+            <p className="mb-8 text-sm text-outline">
               Brak głosowań w {MONTHS_PL[currentMonth - 1].toLowerCase()}{' '}
               {currentYear}.
             </p>
@@ -351,9 +351,9 @@ export default async function MEPProfilePage({
         )}
         {sessionSpeeches.length > 0 && (
           <section className="mb-8">
-            <h2 className="mb-4 text-xl font-semibold text-gray-900">
+            <h2 className="font-display mb-4 text-xl font-semibold text-on-surface">
               Przemówienia w tym miesiącu
-              <span className="ml-2 text-base font-normal text-gray-500">
+              <span className="ml-2 text-base font-normal text-outline">
                 ({sessionSpeeches.length})
               </span>
             </h2>
@@ -362,9 +362,9 @@ export default async function MEPProfilePage({
         )}
         {sessionQuestions.length > 0 && (
           <section className="mb-8">
-            <h2 className="mb-4 text-xl font-semibold text-gray-900">
+            <h2 className="font-display mb-4 text-xl font-semibold text-on-surface">
               Pytania parlamentarne w tym miesiącu
-              <span className="ml-2 text-base font-normal text-gray-500">
+              <span className="ml-2 text-base font-normal text-outline">
                 ({sessionQuestions.length})
               </span>
             </h2>
@@ -373,15 +373,15 @@ export default async function MEPProfilePage({
         )}
         {mep.committees.length > 0 && (
           <section className="mb-8">
-            <h2 className="mb-4 text-2xl font-bold text-gray-900">Komisje</h2>
+            <h2 className="font-display mb-4 text-2xl font-bold text-on-surface">Komisje</h2>
             <CommitteeList committees={mep.committees} />
           </section>
         )}
         {mepDocs.length > 0 && (
           <section className="mb-8">
-            <h2 className="mb-4 text-xl font-semibold text-gray-900">
+            <h2 className="font-display mb-4 text-xl font-semibold text-on-surface">
               Dokumenty plenarne
-              <span className="ml-2 text-base font-normal text-gray-500">
+              <span className="ml-2 text-base font-normal text-outline">
                 ({mepDocs.length})
               </span>
             </h2>
@@ -392,8 +392,8 @@ export default async function MEPProfilePage({
           mep.topVotes.length === 0 &&
           mep.committees.length === 0 &&
           votes.length === 0 && (
-            <div className="rounded-lg border-2 border-dashed border-gray-300 p-12 text-center">
-              <p className="text-gray-600">
+            <div className="rounded-md bg-surface-container-low p-12 text-center">
+              <p className="text-on-surface-variant">
                 Brak danych statystycznych dla tego posła
               </p>
             </div>

@@ -33,15 +33,15 @@ function GroupedMEPList({ meps }: { meps: MEPWithStats[] }) {
         const fullName = EP_GROUP_FULL_NAMES[group]
         return (
           <section key={group}>
-            <div className="mb-4 border-b border-gray-200 pb-2">
-              <h2 className="text-lg font-semibold text-gray-800">
+            <div className="mb-4 pb-2" style={{ borderBottom: '1px solid rgba(196,199,208,0.3)' }}>
+              <h2 className="font-display text-lg font-semibold text-on-surface">
                 {group}
-                <span className="ml-2 text-sm font-normal text-gray-400">
+                <span className="ml-2 text-sm font-normal text-outline">
                   ({groupMeps.length})
                 </span>
               </h2>
               {fullName && fullName !== group && (
-                <p className="text-sm text-gray-500">{fullName}</p>
+                <p className="text-sm text-on-surface-variant">{fullName}</p>
               )}
             </div>
             <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
@@ -188,8 +188,8 @@ export const MEPGrid = ({ meps }: MEPSGridProps) => {
       </p>
 
       {filteredList.length === 0 ? (
-        <div className="rounded-lg border-2 border-dashed border-gray-300 p-12 text-center">
-          <p className="text-gray-600">Brak posłów spełniających kryteria</p>
+        <div className="rounded-md bg-surface-container-low p-12 text-center">
+          <p className="text-on-surface-variant">Brak posłów spełniających kryteria</p>
         </div>
       ) : hasActiveFilters ? (
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">

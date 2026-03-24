@@ -31,8 +31,8 @@ export function MEPCard({
     <Link
       href={`/poslowie/${mep.slug}`}
       className={cn(
-        'block rounded-lg border border-gray-200 bg-white p-6',
-        'shadow-sm transition-shadow hover:shadow-md',
+        'block rounded-md bg-surface-container-lowest p-6',
+        'shadow-ambient transition-shadow hover:shadow-ambient-hover',
         className
       )}
       data-testid={dataTestId}
@@ -40,7 +40,7 @@ export function MEPCard({
       id={id}
     >
       <div className="mb-4 flex items-center gap-3">
-        <div className="h-12 w-12 shrink-0 overflow-hidden rounded-full bg-gray-200">
+        <div className="h-12 w-12 shrink-0 overflow-hidden rounded-full bg-surface-container-high">
           {mep.photoUrl ? (
             <Image
               src={mep.photoUrl}
@@ -50,14 +50,14 @@ export function MEPCard({
               className="h-full w-full object-cover"
             />
           ) : (
-            <div className="flex h-full items-center justify-center text-lg font-bold text-gray-400">
+            <div className="flex h-full items-center justify-center text-lg font-bold text-on-surface-variant">
               {mep.fullName.charAt(0)}
             </div>
           )}
         </div>
         <div>
-          <h3 className="text-lg font-semibold text-gray-900">{mep.fullName}</h3>
-          <div className="mt-1 flex items-center gap-2 text-sm text-gray-600">
+          <h3 className="font-display text-base font-semibold text-on-surface">{mep.fullName}</h3>
+          <div className="mt-1 flex items-center gap-2 text-sm text-on-surface-variant">
             {mep.nationalParty && (
               <>
                 <span className="font-medium">{mep.nationalParty}</span>
@@ -69,29 +69,29 @@ export function MEPCard({
         </div>
       </div>
       {stats ? (
-        <div className="space-y-1">
-          <p className="text-xs font-medium text-gray-400 uppercase tracking-wide">
-            Ostatnia sesja: {MONTHS_PL[stats.month - 1]} {stats.year}
+        <div className="space-y-1.5">
+          <p className="text-xs font-medium uppercase tracking-widest text-outline">
+            {MONTHS_PL[stats.month - 1]} {stats.year}
           </p>
           <div className="flex items-center justify-between text-sm">
-            <span className="text-gray-600">Obecność:</span>
-            <span className="font-semibold text-gray-900">
+            <span className="text-on-surface-variant">Obecność:</span>
+            <span className="font-semibold text-on-surface">
               {getAttendanceLabel(stats.attendanceRate)}{' '}
-              <span className="text-xs font-normal text-gray-500">
+              <span className="text-xs font-normal text-outline">
                 ({stats.attendanceRate.toFixed(1)}%)
               </span>
             </span>
           </div>
           <div className="flex items-center justify-between text-sm">
-            <span className="text-gray-600">Głosowania:</span>
-            <span className="text-xs text-gray-700">
+            <span className="text-on-surface-variant">Głosowania:</span>
+            <span className="text-xs text-on-surface-variant">
               {stats.votesFor} ZA · {stats.votesAgainst} PRZECIW · {stats.votesAbstain} WSTRZ · {stats.votesAbsent} nieob.
             </span>
           </div>
           {(stats.speechesCount || stats.questionsCount) ? (
             <div className="flex items-center justify-between text-sm">
-              <span className="text-gray-600">Aktywność:</span>
-              <span className="text-xs text-gray-700">
+              <span className="text-on-surface-variant">Aktywność:</span>
+              <span className="text-xs text-on-surface-variant">
                 {stats.speechesCount ? `${stats.speechesCount} przemówień` : null}
                 {stats.speechesCount && stats.questionsCount ? ' · ' : null}
                 {stats.questionsCount ? `${stats.questionsCount} pytań` : null}
@@ -100,7 +100,7 @@ export function MEPCard({
           ) : null}
         </div>
       ) : (
-        <div className="text-sm text-gray-500">Brak statystyk</div>
+        <div className="text-sm text-outline">Brak statystyk</div>
       )}
     </Link>
   )

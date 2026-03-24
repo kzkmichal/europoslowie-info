@@ -83,8 +83,8 @@ export default async function GlosowaniaPage({ searchParams }: PageProps) {
     <div className="py-8">
       <Container>
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">Głosowania</h1>
-          <p className="mt-2 text-gray-600">
+          <h1 className="font-display text-3xl font-bold text-on-surface">Głosowania</h1>
+          <p className="mt-2 text-on-surface-variant">
             {total} głosowań z udziałem polskich europosłów
           </p>
         </div>
@@ -97,14 +97,14 @@ export default async function GlosowaniaPage({ searchParams }: PageProps) {
           topics={topics}
         />
         {votes.length === 0 ? (
-          <p className="text-gray-500">Brak głosowań do wyświetlenia.</p>
+          <p className="text-outline">Brak głosowań do wyświetlenia.</p>
         ) : (
           <div className=" flex flex-col">
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {votesByDate &&
                 Object.entries(votesByDate).map(([date, votes]) => (
                   <Fragment key={date}>
-                    <h2 className="col-span-full text-xl font-semibold text-gray-800">
+                    <h2 className="font-display col-span-full text-xl font-semibold text-on-surface">
                       {new Date(date + 'T12:00:00').toLocaleDateString(
                         'pl-PL',
                         {

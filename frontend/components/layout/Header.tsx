@@ -3,16 +3,19 @@ import { Container } from '@/components/layout/Container'
 import { cn } from '@/lib/utils'
 
 const navLinkStyles = cn(
-  'text-sm font-medium text-gray-700',
-  'transition-colors hover:text-blue-600',
+  'text-sm font-medium text-on-surface-variant',
+  'transition-colors hover:text-primary',
 )
 
 export function Header() {
   return (
-    <header className="border-b border-gray-200 bg-white">
+    <header className="sticky top-0 z-50 glass border-b border-outline-variant/15">
       <Container>
         <nav className="flex h-16 items-center justify-between">
-          <Link href="/" className="text-xl font-bold text-blue-600">
+          <Link
+            href="/"
+            className="font-display text-xl font-bold tracking-tight text-primary"
+          >
             Europosłowie.info
           </Link>
           <div className="flex items-center gap-6">

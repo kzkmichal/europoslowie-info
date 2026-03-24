@@ -9,15 +9,19 @@ export const VoteRow = ({ vote }: VoteRowProps) => {
   return (
     <div
       key={vote.id}
-      className="flex items-center gap-4 rounded-lg border border-gray-200 bg-white p-3"
+      className="flex items-center gap-4 rounded-md bg-surface-container-lowest p-3 shadow-ambient"
     >
       <div
         className={cn(
-          'w-24 shrink-0 rounded-full px-2 py-1 text-center text-xs font-semibold',
-          vote.voteChoice === 'FOR' && 'bg-green-100 text-green-800',
-          vote.voteChoice === 'AGAINST' && 'bg-red-100 text-red-800',
-          vote.voteChoice === 'ABSTAIN' && 'bg-yellow-100 text-yellow-800',
-          vote.voteChoice === 'ABSENT' && 'bg-gray-100 text-gray-600',
+          'w-24 shrink-0 rounded px-2 py-1 text-center text-xs font-semibold',
+          vote.voteChoice === 'FOR' &&
+            'bg-on-primary-container text-primary',
+          vote.voteChoice === 'AGAINST' &&
+            'bg-error-container text-on-error-container',
+          vote.voteChoice === 'ABSTAIN' &&
+            'bg-tertiary-fixed text-on-tertiary-fixed-variant',
+          vote.voteChoice === 'ABSENT' &&
+            'bg-surface-container-high text-on-surface-variant',
         )}
       >
         {vote.voteChoice === 'FOR' && 'Za'}
@@ -26,28 +30,30 @@ export const VoteRow = ({ vote }: VoteRowProps) => {
         {vote.voteChoice === 'ABSENT' && 'Nieobecny'}
       </div>
       <div className="min-w-0 flex-1">
-        <p className="text-sm font-medium text-gray-900">{vote.title}</p>
+        <p className="text-sm font-medium text-on-surface">{vote.title}</p>
       </div>
       {vote.result && (
         <span
           className={cn(
-            'shrink-0 rounded-full px-2 py-0.5 text-xs font-medium',
-            vote.result === 'ADOPTED' && 'bg-green-50 text-green-700',
-            vote.result === 'REJECTED' && 'bg-red-50 text-red-700',
+            'shrink-0 rounded px-2 py-0.5 text-xs font-medium',
+            vote.result === 'ADOPTED' &&
+              'bg-secondary-container text-on-secondary-container',
+            vote.result === 'REJECTED' &&
+              'bg-error-container text-on-error-container',
           )}
         >
           {vote.result === 'ADOPTED' ? 'Przyjęto' : 'Odrzucono'}
         </span>
       )}
       {vote.relatedCount != null && vote.relatedCount > 0 && (
-        <span className="shrink-0 rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-500">
+        <span className="shrink-0 rounded bg-surface-container-high px-2 py-0.5 text-xs text-on-surface-variant">
           +{vote.relatedCount} głosowań
         </span>
       )}
       {vote.voteNumber && (
         <a
           href={`/glosowania/${vote.voteNumber}`}
-          className="shrink-0 text-xs text-blue-600 hover:underline"
+          className="shrink-0 text-xs text-secondary hover:underline"
         >
           Szczegóły →
         </a>
