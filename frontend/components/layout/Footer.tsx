@@ -3,29 +3,29 @@ import { Container } from '@/components/layout/Container'
 import { cn } from '@/lib/utils'
 
 const footerLinkStyles = cn(
-  'text-gray-600',
-  'transition-colors hover:text-blue-600'
+  'text-on-surface-variant',
+  'transition-colors hover:text-primary'
 )
 
 export function Footer() {
   const currentYear = new Date().getFullYear()
 
   return (
-    <footer className="mt-auto border-t border-gray-200 bg-gray-50">
+    <footer className="mt-auto bg-surface-container-low">
       <Container>
         <div className="py-8">
           <div className="grid grid-cols-1 gap-8 md:grid-cols-3">
             <div>
-              <h3 className="mb-3 text-sm font-semibold text-gray-900">
+              <h3 className="font-display mb-3 text-sm font-semibold text-on-surface">
                 O projekcie
               </h3>
-              <p className="text-sm text-gray-600">
+              <p className="text-sm text-on-surface-variant">
                 Platforma monitorująca aktywność 53 polskich europosłów w
                 Parlamencie Europejskim.
               </p>
             </div>
             <div>
-              <h3 className="mb-3 text-sm font-semibold text-gray-900">
+              <h3 className="font-display mb-3 text-sm font-semibold text-on-surface">
                 Nawigacja
               </h3>
               <ul className="space-y-2 text-sm">
@@ -52,10 +52,10 @@ export function Footer() {
               </ul>
             </div>
             <div>
-              <h3 className="mb-3 text-sm font-semibold text-gray-900">
+              <h3 className="font-display mb-3 text-sm font-semibold text-on-surface">
                 Informacje
               </h3>
-              <ul className="space-y-2 text-sm text-gray-600">
+              <ul className="space-y-2 text-sm text-on-surface-variant">
                 <li>Dane: Parlament Europejski</li>
                 <li>Ostatnia aktualizacja: Grudzień 2024</li>
                 <li>
@@ -71,8 +71,8 @@ export function Footer() {
               </ul>
             </div>
           </div>
-          <div className="mt-8 border-t border-gray-200 pt-6">
-            <p className="text-center text-sm text-gray-500">
+          <div className="mt-8 pt-6" style={{ borderTop: '1px solid rgba(196,199,208,0.3)' }}>
+            <p className="text-center text-sm text-on-surface-variant">
               © {currentYear} Europosłowie.info. Dane publiczne z Parlamentu
               Europejskiego.
             </p>

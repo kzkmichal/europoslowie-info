@@ -15,7 +15,7 @@ export function CommitteeList({
 }: CommitteeListProps) {
   if (committees.length === 0) {
     return (
-      <div className="text-sm text-gray-500">Brak członkostwa w komisjach</div>
+      <div className="text-sm text-outline">Brak członkostwa w komisjach</div>
     )
   }
 
@@ -29,15 +29,15 @@ export function CommitteeList({
       {committees.map((committee) => (
         <div
           key={committee.id}
-          className="rounded-lg border border-gray-200 bg-white p-4"
+          className="rounded-md bg-surface-container-lowest p-4 shadow-ambient"
         >
           <div className="flex items-start justify-between">
             <div className="flex-1">
-              <h3 className="font-semibold text-gray-900">
+              <h3 className="font-display font-semibold text-on-surface">
                 {committee.committeeName}
               </h3>
               {committee.committeeCode && (
-                <p className="mt-1 text-sm text-gray-500">
+                <p className="mt-1 text-sm text-outline">
                   Kod: {committee.committeeCode}
                 </p>
               )}
@@ -45,11 +45,15 @@ export function CommitteeList({
             {committee.role && (
               <span
                 className={cn(
-                  'ml-4 rounded-full px-3 py-1 text-xs font-medium',
-                  committee.role === 'member' && 'bg-blue-100 text-blue-800',
-                  committee.role === 'chair' && 'bg-purple-100 text-purple-800',
-                  committee.role === 'vice-chair' && 'bg-indigo-100 text-indigo-800',
-                  committee.role === 'substitute' && 'bg-gray-100 text-gray-800',
+                  'ml-4 rounded px-3 py-1 text-xs font-medium',
+                  committee.role === 'member' &&
+                    'bg-secondary-container text-on-secondary-container',
+                  committee.role === 'chair' &&
+                    'bg-tertiary-fixed text-on-tertiary-fixed-variant',
+                  committee.role === 'vice-chair' &&
+                    'bg-on-primary-container text-primary',
+                  committee.role === 'substitute' &&
+                    'bg-surface-container-high text-on-surface-variant',
                 )}
               >
                 {committee.role === 'member' && 'Członek'}
@@ -60,7 +64,7 @@ export function CommitteeList({
             )}
           </div>
           {committee.fromDate && (
-            <div className="mt-2 text-xs text-gray-600">
+            <div className="mt-2 text-xs text-outline">
               <span className="font-medium">Od: </span>
               {new Date(committee.fromDate).toLocaleDateString('pl-PL', {
                 year: 'numeric',

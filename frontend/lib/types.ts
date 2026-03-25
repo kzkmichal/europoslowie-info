@@ -42,6 +42,7 @@ export type MEPWithStats = MEP & {
     title: string
     starsPoland: number | null
   } | null
+  committees: CommitteeMembership[]
 }
 
 /**

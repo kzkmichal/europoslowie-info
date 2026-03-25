@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import './globals.css'
 import { Header } from '@/components/layout/Header'
 import { Footer } from '@/components/layout/Footer'
-import { inter } from './fonts'
+import { inter, publicSans } from './fonts'
 
 export const metadata: Metadata = {
   title: 'Europosłowie.info - Monitoruj polskich posłów w PE',
@@ -35,7 +35,7 @@ export default function RootLayout({
   return (
     <html lang="pl" className="h-full">
       <body
-        className={`${inter.className} flex min-h-full flex-col bg-gray-50`}
+        className={`${inter.variable} ${publicSans.variable} font-sans flex min-h-full flex-col bg-surface`}
       >
         <Header />
         <main className="flex-1">{children}</main>

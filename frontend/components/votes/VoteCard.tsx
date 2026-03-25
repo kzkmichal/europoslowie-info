@@ -27,19 +27,19 @@ export function VoteCard({
     <Link
       href={`/glosowania/${vote.voteNumber ?? vote.id}`}
       className={cn(
-        'block rounded-lg border border-gray-200 bg-white p-4',
-        'shadow-sm transition-shadow hover:shadow-md',
+        'block rounded-md bg-surface-container-lowest p-4',
+        'shadow-ambient transition-shadow hover:shadow-ambient-hover',
         className
       )}
       data-testid={dataTestId}
       data-cc={dataCc}
       id={id}
     >
-      <h3 className="mb-2 line-clamp-2 text-sm font-semibold text-gray-900">
+      <h3 className="font-display mb-2 line-clamp-2 text-sm font-semibold text-on-surface">
         {vote.title}
       </h3>
       {vote.date && (
-        <div className="mb-2 text-xs text-gray-500">
+        <div className="mb-2 text-xs text-outline">
           {new Date(vote.date).toLocaleDateString('pl-PL', {
             year: 'numeric',
             month: 'long',
@@ -51,37 +51,27 @@ export function VoteCard({
       <div className="flex items-center justify-between text-xs">
         {vote.starsPoland !== null && (
           <div className="flex items-center gap-1">
-            <span className="font-medium text-yellow-600">
+            <span className="font-medium text-on-surface-variant">
               {vote.starsPoland}⭐
             </span>
-            <span className="text-gray-500">Polska</span>
+            <span className="text-outline">Polska</span>
           </div>
         )}
-        {/* 
-        {vote.starsEurope !== null && (
-          <div className="flex items-center gap-1">
-            <span className="font-medium text-blue-600">
-              {vote.starsEurope}⭐
-            </span>
-            <span className="text-gray-500">Europa</span>
-          </div>
-        )} */}
       </div>
       {vote.topicCategory && (
         <div className="mt-2">
-          <span className="inline-block rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700">
+          <span className="inline-block rounded bg-secondary-container px-2 py-0.5 text-xs font-medium text-on-secondary-container">
             {vote.topicCategory}
           </span>
         </div>
       )}
       {vote.result && (
         <div className="mt-2 text-xs">
-          <span className="text-gray-600">Wynik: </span>
           <span
             className={cn(
               'font-medium',
-              vote.result === 'ADOPTED' && 'text-green-600',
-              vote.result === 'REJECTED' && 'text-red-600'
+              vote.result === 'ADOPTED' && 'text-secondary',
+              vote.result === 'REJECTED' && 'text-error'
             )}
           >
             {vote.result === 'ADOPTED' ? 'Przyjęto' : 'Odrzucono'}

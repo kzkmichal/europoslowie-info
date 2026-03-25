@@ -50,10 +50,21 @@ export async function getAllMEPsWithStats(): Promise<MEPWithStats[]> {
         .orderBy(desc(votes.starsPoland), desc(votes.date))
         .limit(1)
 
+      const mepCommittees = await db
+        .select()
+        .from(committeeMemberships)
+        .where(
+          and(
+            eq(committeeMemberships.mepId, mep.id),
+            eq(committeeMemberships.isCurrent, true),
+          ),
+        )
+
       return {
         ...mep,
         latestStats: latestStats[0] || null,
         topVote: topVote[0] || null,
+        committees: mepCommittees,
       }
     }),
   )
