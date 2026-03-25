@@ -3,7 +3,7 @@ import { getAllMEPsWithStats } from '@/lib/db/queries'
 import { Container } from '@/components/layout/Container'
 import { MEPGrid } from '@/components/meps/MEPGrid'
 
-export function generateMetadata() {
+export const generateMetadata = () => {
   const metadata = {
     title: 'Polscy Europosłowie - Lista posłów w PE | Europosłowie.info',
     description:
@@ -19,17 +19,24 @@ export default async function HomePage() {
     <div className="py-8">
       <Container>
         <div className="mb-8">
-          <h1 className="font-display text-3xl font-bold text-on-surface">
-            Polscy Europosłowie
+          <h1 className="font-display text-4xl font-black text-on-surface">
+            Polscy <span className="text-primary">Europosłowie</span>
           </h1>
-          <p className="mt-2 text-lg text-on-surface-variant">
-            10. Kadencja Parlamentu Europejskiego (2024-2029)
+          <p className="mt-2 text-base font-medium text-on-surface-variant">
+            10. Kadencja Parlamentu Europejskiego (2024–2029)
           </p>
           <p className="mt-1 text-sm text-outline">
-            Monitorujemy aktywność {meps.length} polskich posłów
+            Śledzimy aktywność, głosowania i obecność {meps.length} polskich
+            posłów do PE
           </p>
         </div>
-        <Suspense fallback={<div className="py-8 text-center text-on-surface-variant">Ładowanie...</div>}>
+        <Suspense
+          fallback={
+            <div className="py-8 text-center text-on-surface-variant">
+              Ładowanie...
+            </div>
+          }
+        >
           <MEPGrid meps={meps} />
         </Suspense>
         {meps.length === 0 && (

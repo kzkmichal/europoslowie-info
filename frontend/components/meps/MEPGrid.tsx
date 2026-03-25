@@ -1,7 +1,7 @@
 'use client'
 import { useMemo } from 'react'
 import { MEPWithStats } from '@/lib/types'
-import { MEPCard } from '@/components/meps/MEPCard'
+import { MEPCard } from '@/components/meps/MEPCard/MEPCard'
 
 const EP_GROUP_FULL_NAMES: Record<string, string> = {
   EPP: 'Europejska Partia Ludowa',
@@ -16,7 +16,7 @@ const EP_GROUP_FULL_NAMES: Record<string, string> = {
   Niezrzeszeni: 'Niezrzeszeni',
 }
 
-function GroupedMEPList({ meps }: { meps: MEPWithStats[] }) {
+const GroupedMEPList = ({ meps }: { meps: MEPWithStats[] }) => {
   const groups = useMemo(() => {
     const groupMap = new Map<string, MEPWithStats[]>()
     for (const mep of meps) {
@@ -33,18 +33,23 @@ function GroupedMEPList({ meps }: { meps: MEPWithStats[] }) {
         const fullName = EP_GROUP_FULL_NAMES[group]
         return (
           <section key={group}>
-            <div className="mb-4 pb-2" style={{ borderBottom: '1px solid rgba(196,199,208,0.3)' }}>
-              <h2 className="font-display text-lg font-semibold text-on-surface">
+            <div
+              className="mb-4 pb-2"
+              style={{ borderBottom: '1px solid rgba(196,199,208,0.3)' }}
+            >
+              <h2 className="font-display text-2xl font-black text-primary">
                 {group}
-                <span className="ml-2 text-sm font-normal text-outline">
+                <span className="ml-2 text-base font-normal text-outline">
                   ({groupMeps.length})
                 </span>
               </h2>
               {fullName && fullName !== group && (
-                <p className="text-sm text-on-surface-variant">{fullName}</p>
+                <p className="text-sm font-medium text-on-surface-variant mt-0.5">
+                  {fullName}
+                </p>
               )}
             </div>
-            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {groupMeps.map((mep) => (
                 <MEPCard key={mep.id} mep={mep} />
               ))}
@@ -110,77 +115,97 @@ export const MEPGrid = ({ meps }: MEPSGridProps) => {
     [meps],
   )
 
+  const filterTriggerClass =
+    'h-10 border border-outline-variant/50 bg-surface-container-lowest rounded-lg px-3 gap-1.5 shadow-none text-sm font-bold text-primary hover:bg-surface-container-low transition-colors [&_[data-slot=select-value]]:font-bold [&_[data-slot=select-value]]:text-primary'
+
+  const filterLabel = (text: string) => (
+    <span className="text-[9px] font-black uppercase tracking-wider text-on-surface-variant/50 font-display shrink-0">
+      {text}
+    </span>
+  )
+
   return (
     <>
-      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:flex-wrap">
+      <div className="mb-4">
+        <div className="flex flex-wrap items-center gap-2">
         <Input
           placeholder="Szukaj posła..."
-          className="sm:max-w-xs"
+          className="w-48 h-10 border-outline-variant/50 bg-surface-container-lowest placeholder:text-on-surface-variant/40"
           type="search"
           value={filters.search}
           onChange={handleSearchChange}
         />
-        <Select
-          value={filters.nationalParty || '__all__'}
-          onValueChange={handleNationalPartyChange}
-        >
-          <SelectTrigger className="sm:max-w-50">
-            <SelectValue placeholder="Polska partia" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="__all__">Wszystkie partie</SelectItem>
-            {nationalParties.map((party) => (
-              <SelectItem key={party} value={party}>
-                {party}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select
-          value={filters.epGroup || '__all__'}
-          onValueChange={handleEpGroupChange}
-        >
-          <SelectTrigger className="sm:max-w-50">
-            <SelectValue placeholder="Eurogrupa" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="__all__">Wszystkie grupy</SelectItem>
-            {epGroups.map((group) => (
-              <SelectItem key={group} value={group}>
-                {group}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select
-          value={filters.attendanceRange || '__all__'}
-          onValueChange={handleAttendanceRangeChange}
-        >
-          <SelectTrigger className="sm:max-w-50">
-            <SelectValue placeholder="Frekwencja" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="__all__">Wszystkie frekwencje</SelectItem>
-            <SelectItem value="high">Wysoka ≥90%</SelectItem>
-            <SelectItem value="medium">Średnia 70–89%</SelectItem>
-            <SelectItem value="low">Niska &lt;70%</SelectItem>
-          </SelectContent>
-        </Select>
-        <Select value={sortBy} onValueChange={handleSortBy}>
-          <SelectTrigger className="sm:max-w-50">
-            <SelectValue placeholder="Sortuj według" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="ranking">Ranking</SelectItem>
-            <SelectItem value="attendance">Frekwencja</SelectItem>
-            <SelectItem value="name">Nazwisko</SelectItem>
-          </SelectContent>
-        </Select>
-        {hasActiveFilters && (
-          <Button variant="outline" size="sm" onClick={clearFilters}>
-            Wyczyść filtry
-          </Button>
-        )}
+          <Select
+            value={filters.nationalParty || '__all__'}
+            onValueChange={handleNationalPartyChange}
+          >
+            <SelectTrigger className={filterTriggerClass}>
+              {filterLabel('Partia')}
+              <SelectValue placeholder="Wszystkie" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__all__">Wszystkie partie</SelectItem>
+              {nationalParties.map((party) => (
+                <SelectItem key={party} value={party}>
+                  {party}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select
+            value={filters.epGroup || '__all__'}
+            onValueChange={handleEpGroupChange}
+          >
+            <SelectTrigger className={filterTriggerClass}>
+              {filterLabel('Eurogrupa')}
+              <SelectValue placeholder="Wszystkie" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__all__">Wszystkie grupy</SelectItem>
+              {epGroups.map((group) => (
+                <SelectItem key={group} value={group}>
+                  {group}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select
+            value={filters.attendanceRange || '__all__'}
+            onValueChange={handleAttendanceRangeChange}
+          >
+            <SelectTrigger className={filterTriggerClass}>
+              {filterLabel('Frekwencja')}
+              <SelectValue placeholder="Wszystkie" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__all__">Wszystkie frekwencje</SelectItem>
+              <SelectItem value="high">Wysoka ≥90%</SelectItem>
+              <SelectItem value="medium">Średnia 70–89%</SelectItem>
+              <SelectItem value="low">Niska &lt;70%</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={sortBy} onValueChange={handleSortBy}>
+            <SelectTrigger className={filterTriggerClass}>
+              {filterLabel('Sortuj')}
+              <SelectValue placeholder="Sortuj" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ranking">Ranking</SelectItem>
+              <SelectItem value="attendance">Frekwencja</SelectItem>
+              <SelectItem value="name">Nazwisko</SelectItem>
+            </SelectContent>
+          </Select>
+          {hasActiveFilters && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={clearFilters}
+              className="ml-auto"
+            >
+              Wyczyść filtry
+            </Button>
+          )}
+        </div>
       </div>
 
       <p className="mb-4 text-sm text-muted-foreground">
@@ -189,10 +214,12 @@ export const MEPGrid = ({ meps }: MEPSGridProps) => {
 
       {filteredList.length === 0 ? (
         <div className="rounded-md bg-surface-container-low p-12 text-center">
-          <p className="text-on-surface-variant">Brak posłów spełniających kryteria</p>
+          <p className="text-on-surface-variant">
+            Brak posłów spełniających kryteria
+          </p>
         </div>
       ) : hasActiveFilters ? (
-        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {filteredList.map((mep) => (
             <MEPCard key={mep.id} mep={mep} />
           ))}

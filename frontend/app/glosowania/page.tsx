@@ -1,9 +1,9 @@
 import { Container } from '@/components/layout/Container'
 import { VoteCard } from '@/components/votes/VoteCard'
 import { VotesFilter } from '@/components/votes/VotesFilter'
+import { Pagination } from '@/components/ui/pagination'
 import { getVotesList, getTopicCategories } from '@/lib/db/queries'
 import type { Metadata } from 'next'
-import Link from 'next/link'
 import { Fragment } from 'react'
 
 export type PageProps = {
@@ -83,7 +83,9 @@ export default async function GlosowaniaPage({ searchParams }: PageProps) {
     <div className="py-8">
       <Container>
         <div className="mb-8">
-          <h1 className="font-display text-3xl font-bold text-on-surface">Głosowania</h1>
+          <h1 className="font-display text-3xl font-bold text-on-surface">
+            Głosowania
+          </h1>
           <p className="mt-2 text-on-surface-variant">
             {total} głosowań z udziałem polskich europosłów
           </p>
@@ -120,21 +122,11 @@ export default async function GlosowaniaPage({ searchParams }: PageProps) {
                   </Fragment>
                 ))}
             </div>
-            <div>
-              {page > 1 && (
-                <Link href={buildUrl({ page: String(page - 1) })}>
-                  Poprzednia
-                </Link>
-              )}
-              <span>
-                Strona {page} z {Math.ceil(total / 50)}
-              </span>
-              {hasMore && (
-                <Link href={buildUrl({ page: String(page + 1) })}>
-                  Następna
-                </Link>
-              )}
-            </div>
+            <Pagination
+              page={page}
+              totalPages={Math.ceil(total / 50)}
+              buildUrl={(p) => buildUrl({ page: String(p) })}
+            />
           </div>
         )}
       </Container>
