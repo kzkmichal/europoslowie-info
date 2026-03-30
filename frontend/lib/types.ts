@@ -86,6 +86,13 @@ export type MEPMonthSummary = {
   location: string | null
 }
 
+export type MEPActivityMonthSummary = {
+  year: number
+  month: number
+  speechesCount: number
+  questionsCount: number
+}
+
 /**
  * Vote with MEP info
  */

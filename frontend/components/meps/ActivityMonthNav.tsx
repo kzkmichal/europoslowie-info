@@ -1,6 +1,5 @@
 'use client'
 
-import { BaseProps, MEPMonthSummary } from '@/lib/types'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
@@ -10,27 +9,23 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-
+import type { MEPActivityMonthSummary } from '@/lib/types'
 import { MONTHS_PL } from '@/lib/constants'
 import { toMonthKey } from '@/lib/utils'
 
-export type VoteMonthNavProps = BaseProps & {
-  months: MEPMonthSummary[]
+type ActivityMonthNavProps = {
+  months: MEPActivityMonthSummary[]
   currentYear: number
   currentMonth: number
   slug: string
-  currentTab?: string
-  showVoteCount?: boolean
 }
 
-const VoteMonthNav = ({
+const ActivityMonthNav = ({
   months,
   currentYear,
   currentMonth,
   slug,
-  currentTab,
-  showVoteCount = true,
-}: VoteMonthNavProps) => {
+}: ActivityMonthNavProps) => {
   const router = useRouter()
 
   if (months.length === 0) return null
@@ -45,7 +40,7 @@ const VoteMonthNav = ({
   const buildUrl = (monthKey: string) => {
     const params = new URLSearchParams()
     params.set('month', monthKey)
-    if (currentTab) params.set('tab', currentTab)
+    params.set('tab', 'activity')
     return `/poslowie/${slug}?${params.toString()}`
   }
 
@@ -63,29 +58,27 @@ const VoteMonthNav = ({
             <SelectValue placeholder="Wybierz miesiąc" />
           </SelectTrigger>
           <SelectContent>
-            {months.map((m) => (
-              <SelectItem
-                key={toMonthKey(m.year, m.month)}
-                value={toMonthKey(m.year, m.month)}
-              >
-                {MONTHS_PL[m.month - 1]} {m.year}
-                {m.location && (
-                  <span className="ml-1 text-gray-400">· {m.location}</span>
-                )}
-                {showVoteCount && (
-                  <span className="ml-1 text-gray-400">({m.voteCount})</span>
-                )}
-              </SelectItem>
-            ))}
+            {months.map((m) => {
+              const total = m.speechesCount + m.questionsCount
+              return (
+                <SelectItem key={toMonthKey(m.year, m.month)} value={toMonthKey(m.year, m.month)}>
+                  {MONTHS_PL[m.month - 1]} {m.year}
+                  {total > 0 && (
+                    <span className="ml-1 text-gray-400">
+                      ({m.speechesCount > 0 && `${m.speechesCount} przem.`}
+                      {m.speechesCount > 0 && m.questionsCount > 0 && ' · '}
+                      {m.questionsCount > 0 && `${m.questionsCount} pyt.`})
+                    </span>
+                  )}
+                </SelectItem>
+              )
+            })}
           </SelectContent>
         </Select>
 
         <div className="flex items-center gap-2">
           {prevMonth ? (
-            <Link
-              href={buildUrl(toMonthKey(prevMonth.year, prevMonth.month))}
-              className={navLinkClass}
-            >
+            <Link href={buildUrl(toMonthKey(prevMonth.year, prevMonth.month))} className={navLinkClass}>
               ← Poprzedni
             </Link>
           ) : (
@@ -94,10 +87,7 @@ const VoteMonthNav = ({
             </span>
           )}
           {nextMonth ? (
-            <Link
-              href={buildUrl(toMonthKey(nextMonth.year, nextMonth.month))}
-              className={navLinkClass}
-            >
+            <Link href={buildUrl(toMonthKey(nextMonth.year, nextMonth.month))} className={navLinkClass}>
               Następny →
             </Link>
           ) : (
@@ -111,4 +101,4 @@ const VoteMonthNav = ({
   )
 }
 
-export default VoteMonthNav
+export default ActivityMonthNav

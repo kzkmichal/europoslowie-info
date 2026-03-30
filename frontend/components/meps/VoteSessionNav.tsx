@@ -57,7 +57,6 @@ const VoteSessionNav = ({
       <h2 className="mb-3 text-2xl font-bold text-gray-900">
         Historia głosowań
       </h2>
-
       <div className="flex flex-wrap items-center gap-2">
         <Select
           value={`${currentSession.id}`}
