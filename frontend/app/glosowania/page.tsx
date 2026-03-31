@@ -87,7 +87,9 @@ export default async function GlosowaniaPage({ searchParams }: PageProps) {
             Głosowania
           </h1>
           <p className="mt-2 text-on-surface-variant">
-            {total} głosowań z udziałem polskich europosłów
+            Kompletne archiwum procesów decyzyjnych Parlamentu Europejskiego.
+            Monitoruj historyczne oraz bieżące wyniki głosowań nad kluczowymi aktami
+            prawnymi kształtującymi przyszłość wspólnoty.
           </p>
         </div>
         <VotesFilter
@@ -102,7 +104,7 @@ export default async function GlosowaniaPage({ searchParams }: PageProps) {
           <p className="text-outline">Brak głosowań do wyświetlenia.</p>
         ) : (
           <div className=" flex flex-col">
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="grid gap-4 lg:grid-cols-2">
               {votesByDate &&
                 Object.entries(votesByDate).map(([date, votes]) => (
                   <Fragment key={date}>
@@ -134,4 +136,4 @@ export default async function GlosowaniaPage({ searchParams }: PageProps) {
   )
 }
 
-export const revalidate = 86400
+export const dynamic = 'force-dynamic'

@@ -108,6 +108,7 @@ export const votes = pgTable('votes', {
   polishVotesAbsent: integer('polish_votes_absent'),
   topicCategory: varchar('topic_category', { length: 100 }),
   policyArea: varchar('policy_area', { length: 100 }),
+  voteDescription: text('vote_description'),
   isMain: boolean('is_main').notNull().default(false),
   decLabel: text('dec_label'),
   createdAt: timestamp('created_at').defaultNow(),

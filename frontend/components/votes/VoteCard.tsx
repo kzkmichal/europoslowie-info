@@ -1,4 +1,6 @@
 import Link from 'next/link'
+import { CheckCircle, XCircle } from 'lucide-react'
+import { Badge } from '@/components/ui/badge'
 import type { BaseProps } from '@/lib/types'
 import { cn } from '@/lib/utils'
 
@@ -10,74 +12,66 @@ type VoteCardVote = {
   result?: string | null
   starsPoland?: number | null
   topicCategory?: string | null
+  relatedCount?: number | null
 }
 
 type VoteCardProps = BaseProps & {
   vote: VoteCardVote
 }
 
-export function VoteCard({
+export const VoteCard = ({
   vote,
   className,
   'data-testid': dataTestId,
   'data-cc': dataCc,
   id,
-}: VoteCardProps) {
+}: VoteCardProps) => {
+  const isAdopted = vote.result === 'ADOPTED'
+  const isRejected = vote.result === 'REJECTED'
+
   return (
     <Link
       href={`/glosowania/${vote.voteNumber ?? vote.id}`}
       className={cn(
-        'block rounded-md bg-surface-container-lowest p-4',
-        'shadow-ambient transition-shadow hover:shadow-ambient-hover',
-        className
+        'group flex flex-col justify-between',
+        'rounded-xl bg-surface-container-lowest border border-outline-variant/10',
+        'p-4 overflow-hidden relative',
+        'hover:shadow-xl hover:shadow-primary/5 transition-all duration-300',
+        className,
       )}
       data-testid={dataTestId}
       data-cc={dataCc}
       id={id}
     >
-      <h3 className="font-display mb-2 line-clamp-2 text-sm font-semibold text-on-surface">
-        {vote.title}
-      </h3>
-      {vote.date && (
-        <div className="mb-2 text-xs text-outline">
-          {new Date(vote.date).toLocaleDateString('pl-PL', {
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric',
-            timeZone: 'UTC',
-          })}
-        </div>
-      )}
-      <div className="flex items-center justify-between text-xs">
-        {vote.starsPoland !== null && (
-          <div className="flex items-center gap-1">
-            <span className="font-medium text-on-surface-variant">
-              {vote.starsPoland}⭐
-            </span>
-            <span className="text-outline">Polska</span>
+      <div>
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2 flex-wrap">
+{vote.topicCategory && (
+              <Badge className="bg-secondary-container/50 text-on-secondary-container border-secondary-container uppercase tracking-tighter font-bold">
+                {vote.topicCategory}
+              </Badge>
+            )}
           </div>
+          {(isAdopted || isRejected) && (
+            <Badge variant={isAdopted ? 'voteFor' : 'voteAgainst'}>
+              {isAdopted ? (
+                <CheckCircle className="w-3.5 h-3.5" />
+              ) : (
+                <XCircle className="w-3.5 h-3.5" />
+              )}
+              {isAdopted ? 'Przyjęto' : 'Odrzucono'}
+            </Badge>
+          )}
+        </div>
+        <h3 className="text-base font-semibold text-primary group-hover:text-primary-container transition-colors leading-snug line-clamp-3">
+          {vote.title}
+        </h3>
+        {vote.relatedCount != null && vote.relatedCount > 0 && (
+          <p className="mt-2 text-xs text-outline">
+            +{vote.relatedCount} głosowań powiązanych
+          </p>
         )}
       </div>
-      {vote.topicCategory && (
-        <div className="mt-2">
-          <span className="inline-block rounded bg-secondary-container px-2 py-0.5 text-xs font-medium text-on-secondary-container">
-            {vote.topicCategory}
-          </span>
-        </div>
-      )}
-      {vote.result && (
-        <div className="mt-2 text-xs">
-          <span
-            className={cn(
-              'font-medium',
-              vote.result === 'ADOPTED' && 'text-secondary',
-              vote.result === 'REJECTED' && 'text-error'
-            )}
-          >
-            {vote.result === 'ADOPTED' ? 'Przyjęto' : 'Odrzucono'}
-          </span>
-        </div>
-      )}
     </Link>
   )
 }

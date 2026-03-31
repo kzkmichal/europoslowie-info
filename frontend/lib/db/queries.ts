@@ -141,6 +141,7 @@ export async function getVoteById(id: number): Promise<VoteDetails | null> {
         fullName: meps.fullName,
         nationalParty: meps.nationalParty,
         epGroup: meps.epGroup,
+        photoUrl: meps.photoUrl,
       },
       voteChoice: votes.voteChoice,
     })
@@ -186,6 +187,7 @@ export async function getVoteDetails(
       documentReference: votes.documentReference,
       documentUrl: votes.documentUrl,
       contextAi: votes.contextAi,
+      voteDescription: votes.voteDescription,
       topicCategory: votes.topicCategory,
       policyArea: votes.policyArea,
       decLabel: votes.decLabel,
@@ -215,6 +217,7 @@ export async function getVoteDetails(
         fullName: meps.fullName,
         nationalParty: meps.nationalParty,
         epGroup: meps.epGroup,
+        photoUrl: meps.photoUrl,
       },
       voteChoice: votes.voteChoice,
     })
@@ -516,6 +519,7 @@ export async function getVotesList(
         )`,
         sessionId: votes.sessionId,
         topicCategory: sql<string | null>`MAX(${votes.topicCategory})`,
+        relatedCount: sql<number>`GREATEST(COUNT(*) - 1, 0)`,
       })
       .from(votes)
       .where(whereClause)
