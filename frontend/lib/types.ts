@@ -64,6 +64,7 @@ export type MEPInfo = {
   fullName: string
   nationalParty: string | null
   epGroup: string | null
+  photoUrl: string | null
 }
 
 export type MEPSessionSummary = {
@@ -256,6 +257,7 @@ export type VoteListItem = {
   polishVotesAbsent: number | null
   sessionId: number
   topicCategory: string | null
+  relatedCount: number
 }
 
 /**

@@ -52,7 +52,7 @@ const ActivityMonthNav = ({
       <div className="flex flex-wrap items-center gap-2">
         <Select
           value={currentKey}
-          onValueChange={(value) => router.push(buildUrl(value))}
+          onValueChange={(value: string) => router.push(buildUrl(value))}
         >
           <SelectTrigger className="w-auto min-w-52">
             <SelectValue placeholder="Wybierz miesiąc" />

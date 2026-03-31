@@ -456,6 +456,52 @@ class SourcesScraper(BaseScraper):
         except Exception:
             return None
 
+    def fetch_oeil_summary_content(self, summary_url: str) -> Optional[str]:
+        """
+        Fetch the text content of an OEIL document-summary page.
+
+        Args:
+            summary_url: Full URL to the OEIL summary page,
+                         e.g. "https://oeil.europarl.europa.eu/oeil/en/document-summary?id=12345"
+
+        Returns:
+            Extracted text content of the summary, or None on failure.
+        """
+        from bs4 import BeautifulSoup
+
+        try:
+            response = self.http.get(
+                summary_url,
+                headers={'Accept': 'text/html,application/xhtml+xml;q=0.9,*/*;q=0.8'},
+                timeout=30,
+            )
+            response.raise_for_status()
+        except Exception as e:
+            self.log_warning(f"Failed to fetch OEIL summary {summary_url}: {e}")
+            return None
+
+        try:
+            soup = BeautifulSoup(response.text, 'lxml')
+        except Exception as e:
+            self.log_warning(f"Failed to parse OEIL summary HTML: {e}")
+            return None
+
+        # The summary text lives in .es_product-content or similar main content area
+        content_el = (
+            soup.select_one('.es_product-content')
+            or soup.select_one('article')
+            or soup.select_one('main')
+        )
+        if not content_el:
+            self.log_info(f"No content element found on summary page: {summary_url}")
+            return None
+
+        paragraphs = [p.get_text(strip=True) for p in content_el.select('p') if p.get_text(strip=True)]
+        if not paragraphs:
+            return None
+
+        return '\n\n'.join(paragraphs)
+
     def _fetch_proc_id_from_document(self, doc_id: str) -> Optional[str]:
         """
         Call /plenary-documents/{doc_id} and extract the internal procedure ID
