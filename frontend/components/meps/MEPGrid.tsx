@@ -3,18 +3,7 @@ import { useMemo } from 'react'
 import { MEPWithStats } from '@/lib/types'
 import { MEPCard } from '@/components/meps/MEPCard/MEPCard'
 
-const EP_GROUP_FULL_NAMES: Record<string, string> = {
-  EPP: 'Europejska Partia Ludowa',
-  'S&D': 'Socjaliści i Demokraci',
-  'Patriots for Europe': 'Patrioci dla Europy',
-  ECR: 'Europejscy Konserwatyści i Reformatorzy',
-  Renew: 'Odnówmy Europę',
-  'Renew Europe': 'Odnówmy Europę',
-  Greens: 'Zieloni / Wolne Przymierze Europejskie',
-  ESN: 'Europa Suwerennych Narodów',
-  NI: 'Niezrzeszeni',
-  Niezrzeszeni: 'Niezrzeszeni',
-}
+import { EP_GROUP_FULL } from '@/lib/constants'
 
 const GroupedMEPList = ({ meps }: { meps: MEPWithStats[] }) => {
   const groups = useMemo(() => {
@@ -30,7 +19,7 @@ const GroupedMEPList = ({ meps }: { meps: MEPWithStats[] }) => {
   return (
     <div className="space-y-10">
       {groups.map(([group, groupMeps]) => {
-        const fullName = EP_GROUP_FULL_NAMES[group]
+        const fullName = EP_GROUP_FULL[group]
         return (
           <section key={group}>
             <div

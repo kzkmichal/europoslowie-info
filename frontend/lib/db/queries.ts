@@ -22,6 +22,7 @@ import type {
   EpGroupRow,
   MEPSessionSummary,
   MEPMonthSummary,
+  MEPActivityMonthSummary,
   MEPVote,
   VoteSource,
 } from '../types'
@@ -832,6 +833,28 @@ export async function getMepMonthList(slug: string): Promise<MEPMonthSummary[]> 
     )
 
   return rows
+}
+
+export async function getMepActivityMonthList(
+  slug: string,
+): Promise<MEPActivityMonthSummary[]> {
+  const mep = await db
+    .select({ id: meps.id })
+    .from(meps)
+    .where(eq(meps.slug, slug))
+    .limit(1)
+  if (!mep[0]) return []
+
+  return db
+    .select({
+      year: monthlyStats.year,
+      month: monthlyStats.month,
+      speechesCount: sql<number>`COALESCE(${monthlyStats.speechesCount}, 0)::int`,
+      questionsCount: sql<number>`COALESCE(${monthlyStats.questionsCount}, 0)::int`,
+    })
+    .from(monthlyStats)
+    .where(eq(monthlyStats.mepId, mep[0].id))
+    .orderBy(desc(monthlyStats.year), desc(monthlyStats.month))
 }
 
 export async function getMepVotesByMonth(

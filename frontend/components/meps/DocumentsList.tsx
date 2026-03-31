@@ -1,16 +1,5 @@
 import type { MepDocument } from '@/lib/db/schema'
-
-const TYPE_LABELS: Record<string, string> = {
-  REPORT_PLENARY: 'Sprawozdanie',
-  RESOLUTION_MOTION: 'Rezolucja',
-  RESOLUTION_MOTION_JOINT: 'Rezolucja wspólna',
-}
-
-const ROLE_LABELS: Record<string, string> = {
-  RAPPORTEUR: 'Sprawozdawca',
-  RAPPORTEUR_CO: 'Współspr.',
-  AUTHOR: 'Autor/ka',
-}
+import { DOC_TYPE_LABELS, DOC_ROLE_LABELS } from '@/lib/constants'
 
 function formatDate(d: Date | null | undefined): string {
   if (!d) return ''
@@ -43,12 +32,12 @@ export function DocumentsList({ documents }: DocumentsListProps) {
             <div className="flex flex-wrap gap-1.5">
               {doc.documentType && (
                 <span className="inline-flex items-center rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-blue-800">
-                  {TYPE_LABELS[doc.documentType] ?? doc.documentType}
+                  {DOC_TYPE_LABELS[doc.documentType] ?? doc.documentType}
                 </span>
               )}
               {doc.role && (
                 <span className="inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800">
-                  {ROLE_LABELS[doc.role] ?? doc.role}
+                  {DOC_ROLE_LABELS[doc.role] ?? doc.role}
                 </span>
               )}
               {doc.committee && (
