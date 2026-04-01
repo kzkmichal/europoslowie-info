@@ -1,3 +1,4 @@
+import { unstable_cache } from 'next/cache'
 import { db } from './index'
 import {
   committeeMemberships,
@@ -442,7 +443,7 @@ export async function getTopicCategories(): Promise<string[]> {
   return rows.map((r) => r.topicCategory).filter((t): t is string => t !== null)
 }
 
-export async function getVotesList(
+async function _getVotesList(
   options: {
     page?: number
     limit?: number
@@ -463,7 +464,10 @@ export async function getVotesList(
     conditions.push(sql`${votes.date} >= ${startDate}::date`)
     conditions.push(sql`${votes.date} <= ${endDate}::date`)
   } else if (year) {
-    conditions.push(sql`EXTRACT(YEAR FROM ${votes.date}) = ${year}`)
+    const startDate = `${year}-01-01`
+    const endDate = `${year}-12-31`
+    conditions.push(sql`${votes.date} >= ${startDate}::date`)
+    conditions.push(sql`${votes.date} <= ${endDate}::date`)
   }
 
   if (result) {
@@ -590,6 +594,11 @@ export async function getVotesList(
     hasMore: offset + votesList.length < total,
   }
 }
+
+export const getVotesList = unstable_cache(_getVotesList, ['votes-list'], {
+  revalidate: 300,
+  tags: ['votes-list'],
+})
 
 export async function getCurrentMonthTopVotes(): Promise<Vote[]> {
   const now = new Date()
