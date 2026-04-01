@@ -22,8 +22,10 @@ depends_on = None
 
 
 def upgrade() -> None:
-    # Drop old single-column unique constraint
-    op.drop_constraint('questions_question_number_unique', 'questions', type_='unique')
+    # Drop old single-column unique constraint if it exists (may not exist on fresh DB)
+    op.execute("""
+        ALTER TABLE questions DROP CONSTRAINT IF EXISTS questions_question_number_unique
+    """)
 
     # Widen column to fit full EP identifier
     op.alter_column(

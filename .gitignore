@@ -63,3 +63,4 @@ docs/
 CLAUDE.local.md
 
 .playwright-mcp/
+*.sql

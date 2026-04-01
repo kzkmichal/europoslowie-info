@@ -22,6 +22,19 @@ depends_on = None
 
 
 def upgrade() -> None:
+    # ── Step 0: create vote_sources if it doesn't exist yet ──────────────────
+    op.execute("""
+        CREATE TABLE IF NOT EXISTS vote_sources (
+            id SERIAL PRIMARY KEY,
+            vote_number VARCHAR(50) NOT NULL,
+            url TEXT NOT NULL,
+            name VARCHAR(200) NOT NULL,
+            source_type VARCHAR(50) NOT NULL,
+            accessed_at TIMESTAMP,
+            created_at TIMESTAMP DEFAULT NOW()
+        )
+    """)
+
     # ── Step 1: delete duplicate rows, keep lowest id ────────────────────────
     op.execute("""
         DELETE FROM vote_sources
