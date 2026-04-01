@@ -51,7 +51,7 @@ export default async function GlosowaniaPage({ searchParams }: PageProps) {
 
   const votesByDate = votes.reduce(
     (acc, vote) => {
-      const dateKey = vote.date.toISOString().split('T')[0]
+      const dateKey = new Date(vote.date).toISOString().split('T')[0]
       if (!acc[dateKey]) {
         acc[dateKey] = []
       }
