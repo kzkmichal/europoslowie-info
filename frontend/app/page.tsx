@@ -49,5 +49,4 @@ export default async function HomePage() {
   )
 }
 
-// Revalidate every 24 hours
-export const revalidate = 86400
+export const dynamic = 'force-dynamic'
