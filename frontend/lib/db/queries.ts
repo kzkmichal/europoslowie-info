@@ -28,49 +28,97 @@ import type {
 } from '../types'
 import type { Vote, Question, Speech, MepDocument } from './schema'
 
+type LatestStatsRow = {
+  id: number
+  mep_id: number
+  year: number
+  month: number
+  total_votes: number
+  votes_for: number
+  votes_against: number
+  votes_abstain: number
+  votes_absent: number
+  attendance_rate: number | string | null
+  questions_count: number | null
+  speeches_count: number | null
+  reports_count: number | null
+  ranking_among_poles: number | null
+  ranking_in_group: number | null
+  votes_poland_5star: number | null
+  votes_poland_4star: number | null
+}
+
+type TopVoteRow = {
+  id: number
+  mep_id: number
+  title: string
+  stars_poland: number | null
+}
+
 export async function getAllMEPsWithStats(): Promise<MEPWithStats[]> {
-  const allMeps = await db.select().from(meps).where(eq(meps.isActive, true))
+  const [allMeps, latestStatsRows, topVoteRows, committeeRows] =
+    await Promise.all([
+      db.select().from(meps).where(eq(meps.isActive, true)),
 
-  const mepsWithStats = await Promise.all(
-    allMeps.map(async (mep) => {
-      const latestStats = await db
-        .select()
-        .from(monthlyStats)
-        .where(eq(monthlyStats.mepId, mep.id))
-        .orderBy(desc(monthlyStats.year), desc(monthlyStats.month))
-        .limit(1)
+      db.execute(sql`
+      SELECT DISTINCT ON (mep_id) *
+      FROM monthly_stats
+      ORDER BY mep_id, year DESC, month DESC
+    `) as Promise<LatestStatsRow[]>,
 
-      const topVote = await db
-        .select({
-          id: votes.id,
-          title: votes.title,
-          starsPoland: votes.starsPoland,
-        })
-        .from(votes)
-        .where(eq(votes.mepId, mep.id))
-        .orderBy(desc(votes.starsPoland), desc(votes.date))
-        .limit(1)
+      db.execute(sql`
+      SELECT DISTINCT ON (mep_id) id, mep_id, title, stars_poland
+      FROM votes
+      ORDER BY mep_id, stars_poland DESC NULLS LAST, date DESC
+    `) as Promise<TopVoteRow[]>,
 
-      const mepCommittees = await db
+      db
         .select()
         .from(committeeMemberships)
-        .where(
-          and(
-            eq(committeeMemberships.mepId, mep.id),
-            eq(committeeMemberships.isCurrent, true),
-          ),
-        )
+        .where(eq(committeeMemberships.isCurrent, true)),
+    ])
 
-      return {
-        ...mep,
-        latestStats: latestStats[0] || null,
-        topVote: topVote[0] || null,
-        committees: mepCommittees,
-      }
-    }),
-  )
+  const statsByMepId = new Map(latestStatsRows.map((r) => [r.mep_id, r]))
+  const topVoteByMepId = new Map(topVoteRows.map((r) => [r.mep_id, r]))
+  const committeesByMepId = new Map<number, (typeof committeeRows)[number][]>()
+  for (const row of committeeRows) {
+    const list = committeesByMepId.get(row.mepId) ?? []
+    list.push(row)
+    committeesByMepId.set(row.mepId, list)
+  }
 
-  return mepsWithStats
+  return allMeps.map((mep) => {
+    const s = statsByMepId.get(mep.id)
+    const v = topVoteByMepId.get(mep.id)
+    return {
+      ...mep,
+      latestStats: s
+        ? {
+            id: s.id,
+            mepId: s.mep_id,
+            year: s.year,
+            month: s.month,
+            totalVotes: s.total_votes,
+            votesFor: s.votes_for,
+            votesAgainst: s.votes_against,
+            votesAbstain: s.votes_abstain,
+            votesAbsent: s.votes_absent,
+            attendanceRate: s.attendance_rate != null ? Number(s.attendance_rate) : 0,
+            questionsCount: s.questions_count,
+            speechesCount: s.speeches_count,
+            reportsCount: s.reports_count,
+            rankingAmongPoles: s.ranking_among_poles,
+            rankingInGroup: s.ranking_in_group,
+            votes5Star: s.votes_poland_5star,
+            votes4Star: s.votes_poland_4star,
+          }
+        : null,
+      topVote: v
+        ? { id: v.id, title: v.title, starsPoland: v.stars_poland }
+        : null,
+      committees: committeesByMepId.get(mep.id) ?? [],
+    }
+  })
 }
 
 export async function getMepBySlug(slug: string): Promise<MEPProfile | null> {
@@ -391,9 +439,7 @@ export async function getTopicCategories(): Promise<string[]> {
     .where(sql`${votes.topicCategory} IS NOT NULL`)
     .orderBy(asc(votes.topicCategory))
 
-  return rows
-    .map((r) => r.topicCategory)
-    .filter((t): t is string => t !== null)
+  return rows.map((r) => r.topicCategory).filter((t): t is string => t !== null)
 }
 
 export async function getVotesList(
@@ -808,7 +854,9 @@ export async function getMepSpeeches(slug: string): Promise<Speech[]> {
     .orderBy(desc(speeches.speechDate))
 }
 
-export async function getMepMonthList(slug: string): Promise<MEPMonthSummary[]> {
+export async function getMepMonthList(
+  slug: string,
+): Promise<MEPMonthSummary[]> {
   const mep = await db
     .select({ id: meps.id })
     .from(meps)

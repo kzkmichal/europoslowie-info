@@ -8,14 +8,23 @@ export const MEPCardStats = ({ stats }: { stats: MonthlyStats }) => {
 
   return (
     <div className="bg-surface-container-low rounded-lg p-3">
-      <p className="text-[10px] font-black uppercase tracking-[0.12em] text-on-surface-variant/60 font-display pb-3 mb-3" style={divider}>
+      <p
+        className="text-[10px] font-black uppercase tracking-[0.12em] text-on-surface-variant/60 font-display pb-3 mb-3"
+        style={divider}
+      >
         Sesja: {MONTHS_PL[stats.month - 1]} {stats.year}
       </p>
 
-      <div className="flex items-center justify-between text-xs pb-3 mb-3" style={divider}>
+      <div
+        className="flex items-center justify-between text-xs pb-3 mb-3"
+        style={divider}
+      >
         <span className={statLabel}>Obecność:</span>
         <div className="flex items-center gap-1.5">
-          <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: att.color }} />
+          <span
+            className="w-2 h-2 rounded-full shrink-0"
+            style={{ backgroundColor: att.color }}
+          />
           <span className="text-[10px] font-semibold text-on-surface-variant">
             {att.label} ({stats.attendanceRate.toFixed(1)}%)
           </span>
