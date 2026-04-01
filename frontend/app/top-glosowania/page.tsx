@@ -90,4 +90,4 @@ export default async function TopVotesPage() {
   )
 }
 
-export const revalidate = 3600 // 1 hour (more frequent than other pages)
+export const dynamic = 'force-dynamic'
