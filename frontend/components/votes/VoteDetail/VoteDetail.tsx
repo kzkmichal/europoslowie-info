@@ -1,4 +1,3 @@
-import { cn } from '@/lib/utils'
 import type {
   VoteDetailsById,
   EpGroupRow,
@@ -11,6 +10,7 @@ import { VoteSourcesPanel } from './components/VoteSourcesPanel'
 import { PolishMEPsSection } from './components/PolishMEPsSection'
 import { GlobalResultsPanel } from './components/GlobalResultsPanel'
 import { RelatedVotesPanel } from './components/RelatedVotesPanel'
+import { RelatedVoteNotice } from './components/RelatedVoteNotice'
 
 type VoteDetailProps = {
   voteDetails: VoteDetailsById
@@ -35,6 +35,7 @@ export const VoteDetail = ({
     result,
     decLabel,
     isMain,
+    isRepresentative,
     votesFor,
     votesAgainst,
     votesAbstain,
@@ -46,12 +47,21 @@ export const VoteDetail = ({
     summary,
   } = voteDetails
 
-  const parsedDescription = voteDescription ? (() => {
-    try { return JSON.parse(voteDescription) } catch { return null }
-  })() : null
+  const isSubVote = !isRepresentative && relatedVotes.length > 0
+  const mainVote = relatedVotes.find((v) => v.isRepresentative)
+
+  const parsedDescription = voteDescription
+    ? (() => {
+        try {
+          return JSON.parse(voteDescription)
+        } catch {
+          return null
+        }
+      })()
+    : null
 
   const contextText = parsedDescription?.description ?? contextAi
-  const hasContext = !!contextText
+  const hasContext = !!contextText && !isSubVote
   const hasSources = voteSources.length > 0
 
   return (
@@ -62,20 +72,21 @@ export const VoteDetail = ({
         result={result}
         decLabel={decLabel}
         isMain={isMain ?? false}
+        isSubVote={isSubVote}
         votesFor={votesFor}
         votesAgainst={votesAgainst}
         epDocInfo={epDocInfo}
       />
 
-      {(hasContext || hasSources) && (
-        <div
-          className={cn(
-            'grid grid-cols-1 gap-8',
-            hasContext && hasSources && 'lg:grid-cols-5',
-          )}
-        >
-          {hasContext && (
-            <div className={cn(hasSources && 'lg:col-span-3')}>
+      {(isSubVote || hasContext) && hasSources ? (
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
+          <div className="lg:col-span-3">
+            {isSubVote ? (
+              <RelatedVoteNotice
+                decLabel={decLabel}
+                mainVote={mainVote ?? null}
+              />
+            ) : (
               <VoteContextPanel
                 contextAi={contextText!}
                 bullets={parsedDescription?.bullets ?? null}
@@ -84,14 +95,31 @@ export const VoteDetail = ({
                 topicCategory={topicCategory}
                 starsPoland={starsPoland}
               />
-            </div>
-          )}
-          {hasSources && (
-            <div className={cn(hasContext && 'lg:col-span-2')}>
-              <VoteSourcesPanel sources={voteSources} />
-            </div>
-          )}
+            )}
+          </div>
+          <div className="lg:col-span-2">
+            <VoteSourcesPanel sources={voteSources} />
+          </div>
         </div>
+      ) : (
+        <>
+          {isSubVote && (
+            <RelatedVoteNotice
+              decLabel={decLabel}
+              mainVote={mainVote ?? null}
+            />
+          )}
+          {hasContext && (
+            <VoteContextPanel
+              contextAi={contextText!}
+              bullets={parsedDescription?.bullets ?? null}
+              isAiGenerated={!!parsedDescription}
+              sourceUrl={parsedDescription?.source_url ?? null}
+              topicCategory={topicCategory}
+              starsPoland={starsPoland}
+            />
+          )}
+        </>
       )}
 
       <PolishMEPsSection
@@ -100,17 +128,21 @@ export const VoteDetail = ({
         epGroupRows={epGroupRows}
       />
 
-      {((votesFor != null || votesAgainst != null || votesAbstain != null) ||
-        relatedVotes.length > 0) && (
+      {(votesFor != null ||
+        votesAgainst != null ||
+        votesAbstain != null ||
+        (!isSubVote && relatedVotes.length > 0)) && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {(votesFor != null || votesAgainst != null || votesAbstain != null) && (
+          {(votesFor != null ||
+            votesAgainst != null ||
+            votesAbstain != null) && (
             <GlobalResultsPanel
               votesFor={votesFor}
               votesAgainst={votesAgainst}
               votesAbstain={votesAbstain}
             />
           )}
-          {relatedVotes.length > 0 && (
+          {!isSubVote && relatedVotes.length > 0 && (
             <RelatedVotesPanel
               votes={relatedVotes}
               currentVoteNumber={voteNumber}

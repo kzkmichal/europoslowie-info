@@ -20,7 +20,7 @@ export const ProfileHeader = ({ mep, docsCount }: ProfileHeaderProps) => {
   return (
     <section className="bg-surface-container-low rounded-xl p-6 mb-6">
       <div className="flex gap-6 items-start">
-        <div className="shrink-0 w-24 lg:w-32 aspect-[3/4] rounded-lg overflow-hidden bg-surface-container-highest">
+        <div className="shrink-0 w-24 lg:w-32 aspect-[3/4] rounded-lg overflow-hidden bg-surface-container-highest ring-1 ring-outline-variant/40">
           {mep.photoUrl ? (
             <Image
               src={mep.photoUrl}

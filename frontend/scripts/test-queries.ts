@@ -44,11 +44,13 @@ async function testQueries() {
     try {
       const vote = await getVoteById(1)
       if (vote) {
-        console.log(`   ✅ Found vote: ${vote.vote.title.substring(0, 50)}...`)
+        console.log(
+          `   ✅ Found vote: ${vote.voteItem?.title.substring(0, 50)}...`,
+        )
         console.log(`   🗳️  Polish votes summary:`, vote.summary)
       } else {
         console.log(
-          '   ℹ️  No vote with ID 1 (this is expected if no votes yet)'
+          '   ℹ️  No vote with ID 1 (this is expected if no votes yet)',
         )
       }
     } catch (err) {

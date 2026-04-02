@@ -10,6 +10,7 @@ import type {
   MEP,
   MonthlyStats,
   Vote,
+  VoteItem,
   VotingSession,
   CommitteeMembership,
 } from './db/schema'
@@ -51,7 +52,7 @@ export type MEPWithStats = MEP & {
  */
 export type MEPProfile = MEP & {
   monthlyStats: MonthlyStats[]
-  topVotes: Vote[]
+  topVotes: VoteItem[]
   committees: CommitteeMembership[]
 }
 
@@ -108,6 +109,7 @@ export type VoteWithMEP = {
  */
 export type VoteDetails = {
   vote: Vote
+  voteItem?: VoteItem
   session: VotingSession
   polishVotes: {
     FOR: VoteWithMEP[]
@@ -179,6 +181,7 @@ export type RelatedVote = {
   votesAgainst: number | null
   votesAbstain: number | null
   isMain: boolean
+  isRepresentative: boolean
 }
 
 /**
@@ -203,6 +206,7 @@ export type VoteDetailsById = {
   policyArea: string | null
   decLabel: string | null
   isMain: boolean | null
+  isRepresentative: boolean
   session: {
     id: number
     sessionNumber: string
@@ -266,7 +270,6 @@ export type VoteListItem = {
  */
 export type VotesList = {
   votes: VoteListItem[]
-  total: number
   page: number
   limit: number
   hasMore: boolean
