@@ -160,14 +160,17 @@ class DatabaseWriter:
         session_ids: Dict[str, int]
     ) -> int:
         """
-        Insert votes (in bulk).
+        Insert votes using the normalized schema.
+
+        Step 1: UPSERT into vote_items (one row per vote_number with all metadata).
+        Step 2: INSERT into votes (one row per mep_id + vote_item_id).
 
         Args:
             votes: List of vote dictionaries
             session_ids: Dictionary mapping session_number to session_id
 
         Returns:
-            Number of votes inserted
+            Number of vote rows inserted
         """
         if not votes:
             logger.warning("No votes to insert")
@@ -175,7 +178,6 @@ class DatabaseWriter:
 
         logger.info(f"Preparing to insert {len(votes)} vote records...")
 
-        # First, get MEP ID mapping (ep_id -> database id)
         mep_id_map = DatabaseWriter._get_mep_id_mapping()
 
         if not mep_id_map:
@@ -188,7 +190,6 @@ class DatabaseWriter:
         with get_db_session() as db_session:
             for vote in votes:
                 try:
-                    # Get session_id from session_number
                     session_number = vote.get('session_number')
                     session_id = session_ids.get(session_number)
 
@@ -199,57 +200,73 @@ class DatabaseWriter:
                         skipped += 1
                         continue
 
-                    # Get MEP database ID
-                    # Try by ep_id first, then by name matching
                     mep_id = None
                     if vote.get('mep_ep_id'):
                         mep_id = mep_id_map.get(vote['mep_ep_id'])
 
                     if not mep_id and vote.get('mep_name'):
-                        # Try to find by name (fuzzy matching)
                         mep_id = DatabaseWriter._find_mep_by_name(
                             db_session,
                             vote['mep_name']
                         )
 
                     if not mep_id:
-                        # Skip votes for non-Polish MEPs
                         skipped += 1
                         continue
 
-                    # Insert vote
-                    query = text("""
-                        INSERT INTO votes (
-                            session_id, mep_id, vote_number, title,
-                            date, vote_choice, result,
+                    # Step 1: Upsert vote_items (metadata, once per vote_number)
+                    upsert_item = text("""
+                        INSERT INTO vote_items (
+                            vote_number, session_id, title, date, result,
                             votes_for, votes_against, votes_abstain,
                             document_reference
                         ) VALUES (
-                            :session_id, :mep_id, :vote_number, :title,
-                            :date, :vote_choice, :result,
+                            :vote_number, :session_id, :title, :date, :result,
                             :votes_for, :votes_against, :votes_abstain,
                             :document_reference
                         )
-                        ON CONFLICT (session_id, mep_id, vote_number) DO NOTHING
+                        ON CONFLICT (vote_number) DO UPDATE SET
+                            session_id         = EXCLUDED.session_id,
+                            title              = EXCLUDED.title,
+                            date               = EXCLUDED.date,
+                            result             = EXCLUDED.result,
+                            votes_for          = EXCLUDED.votes_for,
+                            votes_against      = EXCLUDED.votes_against,
+                            votes_abstain      = EXCLUDED.votes_abstain,
+                            document_reference = EXCLUDED.document_reference,
+                            updated_at         = NOW()
+                        RETURNING id
                     """)
 
-                    db_session.execute(query, {
-                        'session_id': session_id,
-                        'mep_id': mep_id,
+                    result = db_session.execute(upsert_item, {
                         'vote_number': vote['vote_number'],
+                        'session_id': session_id,
                         'title': vote.get('title', 'No title')[:500],
                         'date': vote.get('date'),
-                        'vote_choice': vote['vote_choice'],
                         'result': vote.get('result'),
                         'votes_for': vote.get('total_for', 0),
                         'votes_against': vote.get('total_against', 0),
                         'votes_abstain': vote.get('total_abstain', 0),
-                        'document_reference': vote.get('document_reference')
+                        'document_reference': vote.get('document_reference'),
+                    })
+                    vote_item_id = result.scalar()
+
+                    # Step 2: Insert per-MEP vote row
+                    insert_vote = text("""
+                        INSERT INTO votes (vote_item_id, mep_id, vote_choice)
+                        VALUES (:vote_item_id, :mep_id, :vote_choice)
+                        ON CONFLICT (vote_item_id, mep_id) DO UPDATE SET
+                            vote_choice = EXCLUDED.vote_choice
+                    """)
+
+                    db_session.execute(insert_vote, {
+                        'vote_item_id': vote_item_id,
+                        'mep_id': mep_id,
+                        'vote_choice': vote['vote_choice'],
                     })
 
                     count += 1
 
-                    # Commit in batches to avoid huge transactions
                     if count % 1000 == 0:
                         db_session.commit()
                         logger.info(f"  Inserted {count} votes so far...")

@@ -58,7 +58,7 @@ export const MEPVoteGroup = ({ votes, variant }: MEPVoteGroupProps) => {
             data-epgroup={vote.mep.epGroup ?? ''}
           >
             <div
-              className="w-10 rounded-lg bg-surface-variant overflow-hidden shrink-0"
+              className="w-10 rounded-lg bg-surface-variant overflow-hidden shrink-0 ring-1 ring-outline-variant/40"
               style={{ aspectRatio: '3/4' }}
             >
               {vote.mep.photoUrl ? (
@@ -76,7 +76,7 @@ export const MEPVoteGroup = ({ votes, variant }: MEPVoteGroupProps) => {
               )}
             </div>
             <div className="flex flex-col min-w-0 gap-1">
-              <span className="text-xs font-bold text-primary leading-tight">
+              <span className="text-sm font-bold text-primary leading-tight">
                 {vote.mep.fullName}
               </span>
               <span className="text-xs font-medium text-on-surface-variant tracking-tight">

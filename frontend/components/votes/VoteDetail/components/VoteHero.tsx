@@ -8,6 +8,7 @@ type VoteHeroProps = {
   result: string | null
   decLabel: string | null
   isMain: boolean
+  isSubVote: boolean
   votesFor: number | null
   votesAgainst: number | null
   epDocInfo: { url: string; displayRef: string } | null
@@ -19,6 +20,7 @@ export const VoteHero = ({
   result,
   decLabel,
   isMain,
+  isSubVote,
   votesFor,
   votesAgainst,
   epDocInfo,
@@ -35,6 +37,11 @@ export const VoteHero = ({
         ← Powrót do listy głosowań
       </Link>
       <div className="flex flex-wrap items-center gap-3 mb-4">
+        {isSubVote && (
+          <span className="bg-secondary-container/60 text-on-secondary-container px-3 py-1 rounded-full text-xs font-bold uppercase tracking-widest">
+            Głosowanie powiązane
+          </span>
+        )}
         {epDocInfo && (
           <Link
             href={epDocInfo.url}

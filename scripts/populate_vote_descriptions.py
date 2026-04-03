@@ -107,10 +107,10 @@ def get_votes_needing_description(
         clauses.append("AND vs.vote_number = :vote_number")
         params['vote_number'] = vote_number_filter
     if from_date:
-        clauses.append("AND v.date >= :from_date")
+        clauses.append("AND vi.date >= :from_date")
         params['from_date'] = from_date
     if to_date:
-        clauses.append("AND v.date <= :to_date")
+        clauses.append("AND vi.date <= :to_date")
         params['to_date'] = to_date
 
     extra = '\n          '.join(clauses)
@@ -119,14 +119,14 @@ def get_votes_needing_description(
         no_desc_filter = ""
     else:
         no_desc_filter = """
-          AND v.vote_description IS NULL"""
+          AND vi.vote_description IS NULL"""
 
     sql = text(f"""
         SELECT DISTINCT ON (vs.vote_number)
             vs.vote_number,
             vs.url    AS oeil_summary_url
         FROM vote_sources vs
-        JOIN votes v ON v.vote_number = vs.vote_number
+        JOIN vote_items vi ON vi.vote_number = vs.vote_number
         WHERE vs.source_type = 'OEIL_SUMMARY'
           {extra}
           {no_desc_filter}
@@ -158,7 +158,7 @@ def update_vote_description(
 
     db_session.execute(
         text("""
-            UPDATE votes
+            UPDATE vote_items
                SET vote_description = :desc,
                    updated_at = NOW()
              WHERE vote_number = :vn

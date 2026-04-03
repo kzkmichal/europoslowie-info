@@ -1,14 +1,14 @@
-  import {
-  pgTable,
-  serial,
-  varchar,
-  integer,
-  boolean,
-  timestamp,
-  date,
-  text,
-  jsonb,
-  real,
+import {
+pgTable,
+serial,
+varchar,
+integer,
+boolean,
+timestamp,
+date,
+text,
+jsonb,
+real,
 } from 'drizzle-orm/pg-core'
 import { relations } from 'drizzle-orm'
 
@@ -64,20 +64,14 @@ export const votingSessions = pgTable('voting_sessions', {
   totalVotes: integer('total_votes').default(0),
 })
 
-export const votes = pgTable('votes', {
+export const voteItems = pgTable('vote_items', {
   id: serial('id').primaryKey(),
-  sessionId: integer('session_id')
-    .notNull()
-    .references(() => votingSessions.id),
-  mepId: integer('mep_id')
-    .notNull()
-    .references(() => meps.id),
-  voteNumber: varchar('vote_number', { length: 50 }),
+  voteNumber: varchar('vote_number', { length: 50 }).notNull().unique(),
+  sessionId: integer('session_id').references(() => votingSessions.id),
   title: text('title').notNull(),
   titleEn: text('title_en'),
   date: date('date', { mode: 'date' }).notNull(),
-  voteChoice: varchar('vote_choice', { length: 20 }).notNull(), // FOR, AGAINST, ABSTAIN, ABSENT
-  result: varchar('result', { length: 20 }), // ADOPTED, REJECTED
+  result: varchar('result', { length: 20 }),
   votesFor: integer('votes_for'),
   votesAgainst: integer('votes_against'),
   votesAbstain: integer('votes_abstain'),
@@ -110,9 +104,18 @@ export const votes = pgTable('votes', {
   policyArea: varchar('policy_area', { length: 100 }),
   voteDescription: text('vote_description'),
   isMain: boolean('is_main').notNull().default(false),
+  isRepresentative: boolean('is_representative').notNull().default(false),
+  relatedCount: integer('related_count').notNull().default(0),
   decLabel: text('dec_label'),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
+})
+
+export const votes = pgTable('votes', {
+  id: serial('id').primaryKey(),
+  voteItemId: integer('vote_item_id').notNull().references(() => voteItems.id),
+  mepId: integer('mep_id').notNull().references(() => meps.id),
+  voteChoice: varchar('vote_choice', { length: 20 }).notNull(),
 })
 
 export const questions = pgTable('questions', {
@@ -212,14 +215,22 @@ export const monthlyStatsRelations = relations(monthlyStats, ({ one }) => ({
   }),
 }))
 
+export const voteItemsRelations = relations(voteItems, ({ one, many }) => ({
+  session: one(votingSessions, {
+    fields: [voteItems.sessionId],
+    references: [votingSessions.id],
+  }),
+  votes: many(votes),
+}))
+
 export const votesRelations = relations(votes, ({ one }) => ({
   mep: one(meps, {
     fields: [votes.mepId],
     references: [meps.id],
   }),
-  session: one(votingSessions, {
-    fields: [votes.sessionId],
-    references: [votingSessions.id],
+  voteItem: one(voteItems, {
+    fields: [votes.voteItemId],
+    references: [voteItems.id],
   }),
 }))
 export const questionsRelations = relations(questions, ({ one }) => ({
@@ -255,6 +266,7 @@ export const mepDocumentsRelations = relations(mepDocuments, ({ one }) => ({
 
 export type MEP = typeof meps.$inferSelect
 export type MonthlyStats = typeof monthlyStats.$inferSelect
+export type VoteItem = typeof voteItems.$inferSelect
 export type Vote = typeof votes.$inferSelect
 export type VotingSession = typeof votingSessions.$inferSelect
 export type CommitteeMembership = typeof committeeMemberships.$inferSelect
@@ -263,6 +275,7 @@ export type Speech = typeof speeches.$inferSelect
 
 export type InsertMEP = typeof meps.$inferInsert
 export type InsertMonthlyStats = typeof monthlyStats.$inferInsert
+export type InsertVoteItem = typeof voteItems.$inferInsert
 export type InsertVote = typeof votes.$inferInsert
 export type InsertVotingSession = typeof votingSessions.$inferInsert
 export type InsertCommitteeMembership = typeof committeeMemberships.$inferInsert

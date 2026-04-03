@@ -1,4 +1,4 @@
-import type { MEP, MonthlyStats, Vote } from './schema'
+import type { MEP, MonthlyStats, VoteItem } from './schema'
 
 export interface MEPWithStats {
   id: number
@@ -13,5 +13,5 @@ export interface MEPWithStats {
 
 export interface MEPProfile extends MEP {
   monthlyStats: MonthlyStats[]
-  topVotes: Vote[]
+  topVotes: VoteItem[]
 }

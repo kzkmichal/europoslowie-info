@@ -6,12 +6,13 @@ import {
   mepDocuments,
   monthlyStats,
   votes,
+  voteItems,
   votingSessions,
   voteSources,
   questions,
   speeches,
 } from './schema'
-import { eq, desc, and, sql, count, max, min, asc, gte, lte } from 'drizzle-orm'
+import { eq, desc, and, sql, count, asc, gte, lte, getTableColumns } from 'drizzle-orm'
 import type {
   MEPWithStats,
   MEPProfile,
@@ -27,7 +28,7 @@ import type {
   MEPVote,
   VoteSource,
 } from '../types'
-import type { Vote, Question, Speech, MepDocument } from './schema'
+import type { VoteItem, Question, Speech, MepDocument } from './schema'
 
 type LatestStatsRow = {
   id: number
@@ -50,8 +51,8 @@ type LatestStatsRow = {
 }
 
 type TopVoteRow = {
-  id: number
   mep_id: number
+  id: number
   title: string
   stars_poland: number | null
 }
@@ -68,9 +69,10 @@ export async function getAllMEPsWithStats(): Promise<MEPWithStats[]> {
     `) as Promise<LatestStatsRow[]>,
 
       db.execute(sql`
-      SELECT DISTINCT ON (mep_id) id, mep_id, title, stars_poland
-      FROM votes
-      ORDER BY mep_id, stars_poland DESC NULLS LAST, date DESC
+      SELECT DISTINCT ON (v.mep_id) v.mep_id, vi.id, vi.title, vi.stars_poland
+      FROM votes v
+      JOIN vote_items vi ON vi.id = v.vote_item_id
+      ORDER BY v.mep_id, vi.stars_poland DESC NULLS LAST, vi.date DESC
     `) as Promise<TopVoteRow[]>,
 
       db
@@ -135,10 +137,11 @@ export async function getMepBySlug(slug: string): Promise<MEPProfile | null> {
     .limit(12)
 
   const topVotes = await db
-    .select()
+    .select(getTableColumns(voteItems))
     .from(votes)
-    .where(and(eq(votes.mepId, mep[0].id), sql`${votes.starsPoland} >= 4`))
-    .orderBy(desc(votes.starsPoland), desc(votes.date))
+    .innerJoin(voteItems, eq(votes.voteItemId, voteItems.id))
+    .where(and(eq(votes.mepId, mep[0].id), sql`${voteItems.starsPoland} >= 4`))
+    .orderBy(desc(voteItems.starsPoland), desc(voteItems.date))
     .limit(10)
 
   const committees = await db
@@ -160,27 +163,19 @@ export async function getMepBySlug(slug: string): Promise<MEPProfile | null> {
 }
 
 export async function getVoteById(id: number): Promise<VoteDetails | null> {
-  const voteData = await db
+  const voteItemRow = await db
     .select({
-      vote: votes,
+      voteItem: voteItems,
       session: votingSessions,
     })
     .from(votes)
-    .innerJoin(votingSessions, eq(votes.sessionId, votingSessions.id))
+    .innerJoin(voteItems, eq(votes.voteItemId, voteItems.id))
+    .innerJoin(votingSessions, eq(voteItems.sessionId, votingSessions.id))
     .where(eq(votes.id, id))
 
-  if (!voteData[0]) return null
+  if (!voteItemRow[0]) return null
 
-  const { vote, session } = voteData[0]
-
-  const whereConditions = [
-    eq(votes.sessionId, vote.sessionId),
-    eq(meps.isActive, true),
-  ]
-
-  if (vote.voteNumber) {
-    whereConditions.push(eq(votes.voteNumber, vote.voteNumber))
-  }
+  const { voteItem, session } = voteItemRow[0]
 
   const polishVotes = await db
     .select({
@@ -196,7 +191,7 @@ export async function getVoteById(id: number): Promise<VoteDetails | null> {
     })
     .from(votes)
     .innerJoin(meps, eq(votes.mepId, meps.id))
-    .where(and(...whereConditions))
+    .where(and(eq(votes.voteItemId, voteItem.id), eq(meps.isActive, true)))
     .orderBy(votes.voteChoice, meps.nationalParty, meps.lastName)
 
   const groupedVotes = {
@@ -207,7 +202,13 @@ export async function getVoteById(id: number): Promise<VoteDetails | null> {
   }
 
   return {
-    vote,
+    vote: {
+      id,
+      voteItemId: voteItem.id,
+      mepId: 0,
+      voteChoice: '',
+    },
+    voteItem,
     session,
     polishVotes: groupedVotes,
     summary: {
@@ -222,26 +223,27 @@ export async function getVoteById(id: number): Promise<VoteDetails | null> {
 export async function getVoteDetails(
   voteNumber: string,
 ): Promise<VoteDetailsById | null> {
-  const voteRow = await db
+  const voteItemRow = await db
     .select({
-      voteNumber: votes.voteNumber,
-      title: votes.title,
-      titleEn: votes.titleEn,
-      date: votes.date,
-      result: votes.result,
-      votesFor: votes.votesFor,
-      votesAgainst: votes.votesAgainst,
-      votesAbstain: votes.votesAbstain,
-      starsPoland: votes.starsPoland,
-      documentReference: votes.documentReference,
-      documentUrl: votes.documentUrl,
-      contextAi: votes.contextAi,
-      voteDescription: votes.voteDescription,
-      topicCategory: votes.topicCategory,
-      policyArea: votes.policyArea,
-      decLabel: votes.decLabel,
-      isMain: votes.isMain,
-      sessionId: votes.sessionId,
+      voteNumber: voteItems.voteNumber,
+      title: voteItems.title,
+      titleEn: voteItems.titleEn,
+      date: voteItems.date,
+      result: voteItems.result,
+      votesFor: voteItems.votesFor,
+      votesAgainst: voteItems.votesAgainst,
+      votesAbstain: voteItems.votesAbstain,
+      starsPoland: voteItems.starsPoland,
+      documentReference: voteItems.documentReference,
+      documentUrl: voteItems.documentUrl,
+      contextAi: voteItems.contextAi,
+      voteDescription: voteItems.voteDescription,
+      topicCategory: voteItems.topicCategory,
+      policyArea: voteItems.policyArea,
+      decLabel: voteItems.decLabel,
+      isMain: voteItems.isMain,
+      isRepresentative: voteItems.isRepresentative,
+      voteItemId: voteItems.id,
       session: {
         id: votingSessions.id,
         sessionNumber: votingSessions.sessionNumber,
@@ -249,14 +251,14 @@ export async function getVoteDetails(
         location: votingSessions.location,
       },
     })
-    .from(votes)
-    .innerJoin(votingSessions, eq(votes.sessionId, votingSessions.id))
-    .where(eq(votes.voteNumber, voteNumber))
+    .from(voteItems)
+    .innerJoin(votingSessions, eq(voteItems.sessionId, votingSessions.id))
+    .where(eq(voteItems.voteNumber, voteNumber))
     .limit(1)
 
-  if (!voteRow[0]) return null
+  if (!voteItemRow[0]) return null
 
-  const { session, ...voteData } = voteRow[0]
+  const { session, voteItemId, ...voteData } = voteItemRow[0]
 
   const polishVotes = await db
     .select({
@@ -272,7 +274,7 @@ export async function getVoteDetails(
     })
     .from(votes)
     .innerJoin(meps, eq(votes.mepId, meps.id))
-    .where(and(eq(votes.voteNumber, voteNumber), eq(meps.isActive, true)))
+    .where(and(eq(votes.voteItemId, voteItemId), eq(meps.isActive, true)))
     .orderBy(votes.voteChoice, meps.nationalParty, meps.lastName)
 
   const groupedVotes = {
@@ -284,7 +286,6 @@ export async function getVoteDetails(
 
   return {
     ...voteData,
-    voteNumber: voteData.voteNumber!,
     session,
     polishVotes: groupedVotes,
     summary: {
@@ -299,23 +300,21 @@ export async function getVoteDetails(
 export async function getTopVotesForMonth(
   year: number,
   month: number,
-): Promise<Vote[]> {
+): Promise<VoteItem[]> {
   const startDate = `${year}-${String(month).padStart(2, '0')}-01`
   const endDate = new Date(year, month, 0).toISOString().split('T')[0]
 
-  const topVotes = await db
+  return db
     .select()
-    .from(votes)
+    .from(voteItems)
     .where(
       and(
-        eq(votes.starsPoland, 5),
-        sql`${votes.date} >= ${startDate}::date`,
-        sql`${votes.date} <= ${endDate}::date`,
+        eq(voteItems.starsPoland, 5),
+        sql`${voteItems.date} >= ${startDate}::date`,
+        sql`${voteItems.date} <= ${endDate}::date`,
       ),
     )
-    .orderBy(desc(votes.date))
-
-  return topVotes
+    .orderBy(desc(voteItems.date))
 }
 
 export async function getMepVotes(
@@ -339,80 +338,41 @@ export async function getMepVotes(
 
   const mepId = mep[0].id
 
-  const conditions = [eq(votes.mepId, mepId), eq(votes.isMain, true)]
+  const conditions = [
+    eq(votes.mepId, mepId),
+    eq(voteItems.isRepresentative, true),
+  ]
   if (voteChoice) {
     conditions.push(eq(votes.voteChoice, voteChoice))
   }
 
-  // Priority filters — same logic as getVotesList and getMepVotesBySession:
-  // prefer "całość tekstu" > "Wstępne porozumienie" > "Wniosek o odrzucenie" > latest vote
-  const isFinal = sql`(${votes.decLabel} ILIKE '%całość tekstu%' OR ${votes.decLabel} ILIKE '%cały tekst%')`
-  const isProvisional = sql`${votes.decLabel} ILIKE '%Wstępne porozumienie%'`
-  const isRejection = sql`${votes.decLabel} ILIKE '%Wniosek o odrzucenie%'`
-
   const [totalResult, votesList] = await Promise.all([
     db
-      .select({
-        count: sql<number>`COUNT(DISTINCT (${votes.title}, ${votes.sessionId}))::int`,
-      })
+      .select({ count: sql<number>`COUNT(*)::int` })
       .from(votes)
+      .innerJoin(voteItems, eq(votes.voteItemId, voteItems.id))
       .where(and(...conditions)),
 
     db
       .select({
-        id: min(votes.id),
-        voteNumber: sql<string | null>`COALESCE(
-          MAX(${votes.voteNumber}) FILTER (WHERE ${isFinal}),
-          MAX(${votes.voteNumber}) FILTER (WHERE ${isProvisional}),
-          MAX(${votes.voteNumber}) FILTER (WHERE ${isRejection}),
-          MAX(${votes.voteNumber})
-        )`,
-        title: votes.title,
-        titleEn: max(votes.titleEn),
-        date: max(votes.date),
-        voteChoice: sql<string>`COALESCE(
-          MAX(${votes.voteChoice}) FILTER (WHERE ${isFinal}),
-          MAX(${votes.voteChoice}) FILTER (WHERE ${isProvisional}),
-          MAX(${votes.voteChoice}) FILTER (WHERE ${isRejection}),
-          (ARRAY_AGG(${votes.voteChoice} ORDER BY ${votes.voteNumber} DESC))[1]
-        )`,
-        result: sql<string | null>`COALESCE(
-          MAX(${votes.result}) FILTER (WHERE ${isFinal}),
-          MAX(${votes.result}) FILTER (WHERE ${isProvisional}),
-          MAX(${votes.result}) FILTER (WHERE ${isRejection}),
-          MAX(${votes.result})
-        )`,
-        votesFor: sql<number | null>`COALESCE(
-          MAX(${votes.votesFor}) FILTER (WHERE ${isFinal}),
-          MAX(${votes.votesFor}) FILTER (WHERE ${isProvisional}),
-          MAX(${votes.votesFor}) FILTER (WHERE ${isRejection}),
-          MAX(${votes.votesFor})
-        )`,
-        votesAgainst: sql<number | null>`COALESCE(
-          MAX(${votes.votesAgainst}) FILTER (WHERE ${isFinal}),
-          MAX(${votes.votesAgainst}) FILTER (WHERE ${isProvisional}),
-          MAX(${votes.votesAgainst}) FILTER (WHERE ${isRejection}),
-          MAX(${votes.votesAgainst})
-        )`,
-        votesAbstain: sql<number | null>`COALESCE(
-          MAX(${votes.votesAbstain}) FILTER (WHERE ${isFinal}),
-          MAX(${votes.votesAbstain}) FILTER (WHERE ${isProvisional}),
-          MAX(${votes.votesAbstain}) FILTER (WHERE ${isRejection}),
-          MAX(${votes.votesAbstain})
-        )`,
-        starsPoland: sql<number | null>`COALESCE(
-          MAX(${votes.starsPoland}) FILTER (WHERE ${isFinal}),
-          MAX(${votes.starsPoland}) FILTER (WHERE ${isProvisional}),
-          MAX(${votes.starsPoland}) FILTER (WHERE ${isRejection}),
-          MAX(${votes.starsPoland})
-        )`,
-        sessionId: votes.sessionId,
-        relatedCount: sql<number>`GREATEST(COUNT(*) - 1, 0)::int`,
+        id: voteItems.id,
+        voteNumber: voteItems.voteNumber,
+        title: voteItems.title,
+        titleEn: voteItems.titleEn,
+        date: voteItems.date,
+        voteChoice: votes.voteChoice,
+        result: voteItems.result,
+        votesFor: voteItems.votesFor,
+        votesAgainst: voteItems.votesAgainst,
+        votesAbstain: voteItems.votesAbstain,
+        starsPoland: voteItems.starsPoland,
+        sessionId: voteItems.sessionId,
+        relatedCount: voteItems.relatedCount,
       })
       .from(votes)
+      .innerJoin(voteItems, eq(votes.voteItemId, voteItems.id))
       .where(and(...conditions))
-      .groupBy(votes.title, votes.sessionId)
-      .orderBy(desc(max(votes.date)), min(votes.id))
+      .orderBy(desc(voteItems.date), desc(voteItems.id))
       .limit(limit)
       .offset(offset),
   ])
@@ -425,6 +385,7 @@ export async function getMepVotes(
       id: v.id ?? 0,
       title: v.title ?? '',
       date: v.date ?? new Date(),
+      sessionId: v.sessionId ?? 0,
     })),
     total,
     page,
@@ -435,10 +396,10 @@ export async function getMepVotes(
 
 export async function getTopicCategories(): Promise<string[]> {
   const rows = await db
-    .selectDistinct({ topicCategory: votes.topicCategory })
-    .from(votes)
-    .where(sql`${votes.topicCategory} IS NOT NULL`)
-    .orderBy(asc(votes.topicCategory))
+    .selectDistinct({ topicCategory: voteItems.topicCategory })
+    .from(voteItems)
+    .where(sql`${voteItems.topicCategory} IS NOT NULL`)
+    .orderBy(asc(voteItems.topicCategory))
 
   return rows.map((r) => r.topicCategory).filter((t): t is string => t !== null)
 }
@@ -457,141 +418,71 @@ async function _getVotesList(
   const { page = 1, limit = 20, year, month, result, search, topic } = options
   const offset = (page - 1) * limit
 
-  const conditions = [eq(votes.isMain, true)]
+  const conditions = [eq(voteItems.isRepresentative, true)]
   if (year && month) {
     const startDate = `${year}-${String(month).padStart(2, '0')}-01`
     const endDate = new Date(year, month, 0).toISOString().split('T')[0]
-    conditions.push(sql`${votes.date} >= ${startDate}::date`)
-    conditions.push(sql`${votes.date} <= ${endDate}::date`)
+    conditions.push(sql`${voteItems.date} >= ${startDate}::date`)
+    conditions.push(sql`${voteItems.date} <= ${endDate}::date`)
   } else if (year) {
     const startDate = `${year}-01-01`
     const endDate = `${year}-12-31`
-    conditions.push(sql`${votes.date} >= ${startDate}::date`)
-    conditions.push(sql`${votes.date} <= ${endDate}::date`)
+    conditions.push(sql`${voteItems.date} >= ${startDate}::date`)
+    conditions.push(sql`${voteItems.date} <= ${endDate}::date`)
   }
 
   if (result) {
-    conditions.push(eq(votes.result, result))
+    conditions.push(eq(voteItems.result, result))
   }
 
   if (search) {
-    conditions.push(sql`${votes.title} ILIKE ${'%' + search + '%'}`)
+    conditions.push(sql`${voteItems.title} ILIKE ${'%' + search + '%'}`)
   }
 
   if (topic) {
-    conditions.push(eq(votes.topicCategory, topic))
+    conditions.push(eq(voteItems.topicCategory, topic))
   }
 
   const whereClause = and(...conditions)
 
-  // Priority filters for representative vote selection within each (title, session) group:
-  // 1. "całość tekstu" / "cały tekst" — final vote on the whole text
-  // 2. "Wstępne porozumienie" — provisional agreement
-  // 3. "Wniosek o odrzucenie" — proposal to reject
-  // 4. fallback: highest vote_number (latest in session)
-  const isFinal = sql`(${votes.decLabel} ILIKE '%całość tekstu%' OR ${votes.decLabel} ILIKE '%cały tekst%')`
-  const isProvisional = sql`${votes.decLabel} ILIKE '%Wstępne porozumienie%'`
-  const isRejection = sql`${votes.decLabel} ILIKE '%Wniosek o odrzucenie%'`
+  const votesList = await db
+    .select({
+      id: voteItems.id,
+      voteNumber: voteItems.voteNumber,
+      title: voteItems.title,
+      titleEn: voteItems.titleEn,
+      date: voteItems.date,
+      result: voteItems.result,
+      votesFor: voteItems.votesFor,
+      votesAgainst: voteItems.votesAgainst,
+      votesAbstain: voteItems.votesAbstain,
+      starsPoland: voteItems.starsPoland,
+      polishVotesFor: voteItems.polishVotesFor,
+      polishVotesAgainst: voteItems.polishVotesAgainst,
+      polishVotesAbstain: voteItems.polishVotesAbstain,
+      polishVotesAbsent: voteItems.polishVotesAbsent,
+      sessionId: voteItems.sessionId,
+      topicCategory: voteItems.topicCategory,
+      relatedCount: voteItems.relatedCount,
+    })
+    .from(voteItems)
+    .where(whereClause)
+    .orderBy(desc(voteItems.date), desc(voteItems.id))
+    .limit(limit + 1)
+    .offset(offset)
 
-  const [totalResult, votesList] = await Promise.all([
-    db
-      .select({
-        count: sql<number>`COUNT(DISTINCT (${votes.title}, ${votes.sessionId}))::int`,
-      })
-      .from(votes)
-      .where(whereClause),
-
-    db
-      .select({
-        id: min(votes.id),
-        voteNumber: sql<string | null>`COALESCE(
-          MAX(${votes.voteNumber}) FILTER (WHERE ${isFinal}),
-          MAX(${votes.voteNumber}) FILTER (WHERE ${isProvisional}),
-          MAX(${votes.voteNumber}) FILTER (WHERE ${isRejection}),
-          MAX(${votes.voteNumber})
-        )`,
-        title: votes.title,
-        titleEn: max(votes.titleEn),
-        date: max(votes.date),
-        result: sql<string | null>`COALESCE(
-          MAX(${votes.result}) FILTER (WHERE ${isFinal}),
-          MAX(${votes.result}) FILTER (WHERE ${isProvisional}),
-          MAX(${votes.result}) FILTER (WHERE ${isRejection}),
-          MAX(${votes.result})
-        )`,
-        votesFor: sql<number | null>`COALESCE(
-          MAX(${votes.votesFor}) FILTER (WHERE ${isFinal}),
-          MAX(${votes.votesFor}) FILTER (WHERE ${isProvisional}),
-          MAX(${votes.votesFor}) FILTER (WHERE ${isRejection}),
-          MAX(${votes.votesFor})
-        )`,
-        votesAgainst: sql<number | null>`COALESCE(
-          MAX(${votes.votesAgainst}) FILTER (WHERE ${isFinal}),
-          MAX(${votes.votesAgainst}) FILTER (WHERE ${isProvisional}),
-          MAX(${votes.votesAgainst}) FILTER (WHERE ${isRejection}),
-          MAX(${votes.votesAgainst})
-        )`,
-        votesAbstain: sql<number | null>`COALESCE(
-          MAX(${votes.votesAbstain}) FILTER (WHERE ${isFinal}),
-          MAX(${votes.votesAbstain}) FILTER (WHERE ${isProvisional}),
-          MAX(${votes.votesAbstain}) FILTER (WHERE ${isRejection}),
-          MAX(${votes.votesAbstain})
-        )`,
-        starsPoland: sql<number | null>`COALESCE(
-          MAX(${votes.starsPoland}) FILTER (WHERE ${isFinal}),
-          MAX(${votes.starsPoland}) FILTER (WHERE ${isProvisional}),
-          MAX(${votes.starsPoland}) FILTER (WHERE ${isRejection}),
-          MAX(${votes.starsPoland})
-        )`,
-        polishVotesFor: sql<number | null>`COALESCE(
-          MAX(${votes.polishVotesFor}) FILTER (WHERE ${isFinal}),
-          MAX(${votes.polishVotesFor}) FILTER (WHERE ${isProvisional}),
-          MAX(${votes.polishVotesFor}) FILTER (WHERE ${isRejection}),
-          MAX(${votes.polishVotesFor})
-        )`,
-        polishVotesAgainst: sql<number | null>`COALESCE(
-          MAX(${votes.polishVotesAgainst}) FILTER (WHERE ${isFinal}),
-          MAX(${votes.polishVotesAgainst}) FILTER (WHERE ${isProvisional}),
-          MAX(${votes.polishVotesAgainst}) FILTER (WHERE ${isRejection}),
-          MAX(${votes.polishVotesAgainst})
-        )`,
-        polishVotesAbstain: sql<number | null>`COALESCE(
-          MAX(${votes.polishVotesAbstain}) FILTER (WHERE ${isFinal}),
-          MAX(${votes.polishVotesAbstain}) FILTER (WHERE ${isProvisional}),
-          MAX(${votes.polishVotesAbstain}) FILTER (WHERE ${isRejection}),
-          MAX(${votes.polishVotesAbstain})
-        )`,
-        polishVotesAbsent: sql<number | null>`COALESCE(
-          MAX(${votes.polishVotesAbsent}) FILTER (WHERE ${isFinal}),
-          MAX(${votes.polishVotesAbsent}) FILTER (WHERE ${isProvisional}),
-          MAX(${votes.polishVotesAbsent}) FILTER (WHERE ${isRejection}),
-          MAX(${votes.polishVotesAbsent})
-        )`,
-        sessionId: votes.sessionId,
-        topicCategory: sql<string | null>`MAX(${votes.topicCategory})`,
-        relatedCount: sql<number>`GREATEST(COUNT(*) - 1, 0)`,
-      })
-      .from(votes)
-      .where(whereClause)
-      .groupBy(votes.title, votes.sessionId)
-      .orderBy(desc(max(votes.date)), min(votes.id))
-      .limit(limit)
-      .offset(offset),
-  ])
-
-  const total = Number(totalResult[0]?.count ?? 0)
+  const hasMore = votesList.length > limit
+  const pageVotes = hasMore ? votesList.slice(0, limit) : votesList
 
   return {
-    votes: votesList.map((v) => ({
+    votes: pageVotes.map((v) => ({
       ...v,
-      id: v.id ?? 0,
-      title: v.title ?? '',
       date: v.date ?? new Date(),
+      sessionId: v.sessionId ?? 0,
     })),
-    total,
     page,
     limit,
-    hasMore: offset + votesList.length < total,
+    hasMore,
   }
 }
 
@@ -600,7 +491,7 @@ export const getVotesList = unstable_cache(_getVotesList, ['votes-list'], {
   tags: ['votes-list'],
 })
 
-export async function getCurrentMonthTopVotes(): Promise<Vote[]> {
+export async function getCurrentMonthTopVotes(): Promise<VoteItem[]> {
   const now = new Date()
   const year = now.getFullYear()
   const month = now.getMonth() + 1
@@ -619,7 +510,8 @@ export async function getEpGroupBreakdown(
     })
     .from(votes)
     .innerJoin(meps, eq(votes.mepId, meps.id))
-    .where(and(eq(votes.voteNumber, voteNumber), eq(meps.isActive, true)))
+    .innerJoin(voteItems, eq(votes.voteItemId, voteItems.id))
+    .where(and(eq(voteItems.voteNumber, voteNumber), eq(meps.isActive, true)))
     .groupBy(meps.epGroup, votes.voteChoice)
 
   const grouped: Record<string, EpGroupRow> = {}
@@ -650,46 +542,48 @@ export async function getEpGroupBreakdown(
 export async function getRelatedVotes(
   voteNumber: string,
 ): Promise<RelatedVote[]> {
-  const voteRow = await db
-    .select({ title: votes.title, sessionId: votes.sessionId })
-    .from(votes)
-    .where(eq(votes.voteNumber, voteNumber))
+  const voteItemRow = await db
+    .select({ title: voteItems.title, sessionId: voteItems.sessionId })
+    .from(voteItems)
+    .where(eq(voteItems.voteNumber, voteNumber))
     .limit(1)
 
-  if (!voteRow[0]) return []
+  if (!voteItemRow[0]) return []
 
-  const { title, sessionId } = voteRow[0]
+  const { title, sessionId } = voteItemRow[0]
 
   const related = await db
     .select({
-      voteNumber: votes.voteNumber,
-      decLabel: max(votes.decLabel),
-      result: max(votes.result),
-      votesFor: max(votes.votesFor),
-      votesAgainst: max(votes.votesAgainst),
-      votesAbstain: max(votes.votesAbstain),
-      isMain: sql<boolean>`bool_or(${votes.isMain})`,
+      voteNumber: voteItems.voteNumber,
+      decLabel: voteItems.decLabel,
+      result: voteItems.result,
+      votesFor: voteItems.votesFor,
+      votesAgainst: voteItems.votesAgainst,
+      votesAbstain: voteItems.votesAbstain,
+      isMain: voteItems.isMain,
+      isRepresentative: voteItems.isRepresentative,
     })
-    .from(votes)
-    .where(and(eq(votes.title, title), eq(votes.sessionId, sessionId)))
-    .groupBy(votes.voteNumber)
-    .orderBy(votes.voteNumber)
+    .from(voteItems)
+    .where(
+      and(
+        eq(voteItems.title, title),
+        sessionId != null ? eq(voteItems.sessionId, sessionId) : sql`false`,
+      ),
+    )
+    .orderBy(voteItems.voteNumber)
 
   if (related.length <= 1) return []
 
-  return related
-    .filter(
-      (r): r is typeof r & { voteNumber: string } => r.voteNumber !== null,
-    )
-    .map((r) => ({
-      voteNumber: r.voteNumber,
-      decLabel: r.decLabel ?? null,
-      result: r.result ?? null,
-      votesFor: r.votesFor ?? null,
-      votesAgainst: r.votesAgainst ?? null,
-      votesAbstain: r.votesAbstain ?? null,
-      isMain: r.isMain,
-    }))
+  return related.map((r) => ({
+    voteNumber: r.voteNumber,
+    decLabel: r.decLabel ?? null,
+    result: r.result ?? null,
+    votesFor: r.votesFor ?? null,
+    votesAgainst: r.votesAgainst ?? null,
+    votesAbstain: r.votesAbstain ?? null,
+    isMain: r.isMain,
+    isRepresentative: r.isRepresentative,
+  }))
 }
 
 export async function getMepSessionList(
@@ -719,8 +613,9 @@ export async function getMepSessionList(
       votesAbsent: sql<number>`SUM(CASE WHEN ${votes.voteChoice} = 'ABSENT' THEN 1 ELSE 0 END)`,
     })
     .from(votes)
-    .innerJoin(votingSessions, eq(votes.sessionId, votingSessions.id))
-    .where(and(eq(votes.mepId, mepId), eq(votes.isMain, true)))
+    .innerJoin(voteItems, eq(votes.voteItemId, voteItems.id))
+    .innerJoin(votingSessions, eq(voteItems.sessionId, votingSessions.id))
+    .where(and(eq(votes.mepId, mepId), eq(voteItems.isMain, true)))
     .groupBy(
       votingSessions.id,
       votingSessions.sessionNumber,
@@ -751,76 +646,32 @@ export async function getMepVotesBySession(
 
   const mepId = mep[0].id
 
-  // Priority filters — same logic as getVotesList:
-  // prefer "całość tekstu" > "Wstępne porozumienie" > "Wniosek o odrzucenie" > latest vote
-  const isFinal = sql`(${votes.decLabel} ILIKE '%całość tekstu%' OR ${votes.decLabel} ILIKE '%cały tekst%')`
-  const isProvisional = sql`${votes.decLabel} ILIKE '%Wstępne porozumienie%'`
-  const isRejection = sql`${votes.decLabel} ILIKE '%Wniosek o odrzucenie%'`
-
   const votesList = await db
     .select({
-      id: min(votes.id),
-      voteNumber: sql<string | null>`COALESCE(
-        MAX(${votes.voteNumber}) FILTER (WHERE ${isFinal}),
-        MAX(${votes.voteNumber}) FILTER (WHERE ${isProvisional}),
-        MAX(${votes.voteNumber}) FILTER (WHERE ${isRejection}),
-        MAX(${votes.voteNumber})
-      )`,
-      title: votes.title,
-      titleEn: max(votes.titleEn),
-      date: max(votes.date),
-      // For voteChoice use ARRAY_AGG ordered by vote_number DESC so the fallback
-      // correctly picks the MEP's choice on the latest (most final) vote
-      voteChoice: sql<string>`COALESCE(
-        MAX(${votes.voteChoice}) FILTER (WHERE ${isFinal}),
-        MAX(${votes.voteChoice}) FILTER (WHERE ${isProvisional}),
-        MAX(${votes.voteChoice}) FILTER (WHERE ${isRejection}),
-        (ARRAY_AGG(${votes.voteChoice} ORDER BY ${votes.voteNumber} DESC))[1]
-      )`,
-      result: sql<string | null>`COALESCE(
-        MAX(${votes.result}) FILTER (WHERE ${isFinal}),
-        MAX(${votes.result}) FILTER (WHERE ${isProvisional}),
-        MAX(${votes.result}) FILTER (WHERE ${isRejection}),
-        MAX(${votes.result})
-      )`,
-      votesFor: sql<number | null>`COALESCE(
-        MAX(${votes.votesFor}) FILTER (WHERE ${isFinal}),
-        MAX(${votes.votesFor}) FILTER (WHERE ${isProvisional}),
-        MAX(${votes.votesFor}) FILTER (WHERE ${isRejection}),
-        MAX(${votes.votesFor})
-      )`,
-      votesAgainst: sql<number | null>`COALESCE(
-        MAX(${votes.votesAgainst}) FILTER (WHERE ${isFinal}),
-        MAX(${votes.votesAgainst}) FILTER (WHERE ${isProvisional}),
-        MAX(${votes.votesAgainst}) FILTER (WHERE ${isRejection}),
-        MAX(${votes.votesAgainst})
-      )`,
-      votesAbstain: sql<number | null>`COALESCE(
-        MAX(${votes.votesAbstain}) FILTER (WHERE ${isFinal}),
-        MAX(${votes.votesAbstain}) FILTER (WHERE ${isProvisional}),
-        MAX(${votes.votesAbstain}) FILTER (WHERE ${isRejection}),
-        MAX(${votes.votesAbstain})
-      )`,
-      starsPoland: sql<number | null>`COALESCE(
-        MAX(${votes.starsPoland}) FILTER (WHERE ${isFinal}),
-        MAX(${votes.starsPoland}) FILTER (WHERE ${isProvisional}),
-        MAX(${votes.starsPoland}) FILTER (WHERE ${isRejection}),
-        MAX(${votes.starsPoland})
-      )`,
-      sessionId: votes.sessionId,
-      // How many sub-votes (Ust., Popr.) were grouped here beyond the representative
-      relatedCount: sql<number>`GREATEST(COUNT(*) - 1, 0)::int`,
+      id: voteItems.id,
+      voteNumber: voteItems.voteNumber,
+      title: voteItems.title,
+      titleEn: voteItems.titleEn,
+      date: voteItems.date,
+      voteChoice: votes.voteChoice,
+      result: voteItems.result,
+      votesFor: voteItems.votesFor,
+      votesAgainst: voteItems.votesAgainst,
+      votesAbstain: voteItems.votesAbstain,
+      starsPoland: voteItems.starsPoland,
+      sessionId: voteItems.sessionId,
+      relatedCount: voteItems.relatedCount,
     })
     .from(votes)
+    .innerJoin(voteItems, eq(votes.voteItemId, voteItems.id))
     .where(
       and(
         eq(votes.mepId, mepId),
-        eq(votes.isMain, true),
-        eq(votes.sessionId, sessionId),
+        eq(voteItems.isRepresentative, true),
+        eq(voteItems.sessionId, sessionId),
       ),
     )
-    .groupBy(votes.title, votes.sessionId)
-    .orderBy(sql`MAX(${votes.voteNumber}) ASC`)
+    .orderBy(asc(voteItems.voteNumber))
 
   return votesList.map((v) => ({
     ...v,
@@ -828,6 +679,7 @@ export async function getMepVotesBySession(
     title: v.title ?? '',
     titleEn: v.titleEn ?? '',
     date: v.date ?? new Date(),
+    sessionId: v.sessionId ?? 0,
   }))
 }
 
@@ -876,21 +728,22 @@ export async function getMepMonthList(
 
   const rows = await db
     .select({
-      year: sql<number>`EXTRACT(YEAR FROM ${votes.date})::int`,
-      month: sql<number>`EXTRACT(MONTH FROM ${votes.date})::int`,
-      voteCount: sql<number>`COUNT(DISTINCT ${votes.title})::int`,
+      year: sql<number>`EXTRACT(YEAR FROM ${voteItems.date})::int`,
+      month: sql<number>`EXTRACT(MONTH FROM ${voteItems.date})::int`,
+      voteCount: sql<number>`COUNT(DISTINCT ${voteItems.title})::int`,
       location: sql<string | null>`MAX(${votingSessions.location})`,
     })
     .from(votes)
-    .innerJoin(votingSessions, eq(votes.sessionId, votingSessions.id))
-    .where(and(eq(votes.mepId, mep[0].id), eq(votes.isMain, true)))
+    .innerJoin(voteItems, eq(votes.voteItemId, voteItems.id))
+    .innerJoin(votingSessions, eq(voteItems.sessionId, votingSessions.id))
+    .where(and(eq(votes.mepId, mep[0].id), eq(voteItems.isMain, true)))
     .groupBy(
-      sql`EXTRACT(YEAR FROM ${votes.date})`,
-      sql`EXTRACT(MONTH FROM ${votes.date})`,
+      sql`EXTRACT(YEAR FROM ${voteItems.date})`,
+      sql`EXTRACT(MONTH FROM ${voteItems.date})`,
     )
     .orderBy(
-      desc(sql`EXTRACT(YEAR FROM ${votes.date})`),
-      desc(sql`EXTRACT(MONTH FROM ${votes.date})`),
+      desc(sql`EXTRACT(YEAR FROM ${voteItems.date})`),
+      desc(sql`EXTRACT(MONTH FROM ${voteItems.date})`),
     )
 
   return rows
@@ -933,72 +786,33 @@ export async function getMepVotesByMonth(
 
   const mepId = mep[0].id
 
-  const isFinal = sql`(${votes.decLabel} ILIKE '%całość tekstu%' OR ${votes.decLabel} ILIKE '%cały tekst%')`
-  const isProvisional = sql`${votes.decLabel} ILIKE '%Wstępne porozumienie%'`
-  const isRejection = sql`${votes.decLabel} ILIKE '%Wniosek o odrzucenie%'`
-
   const votesList = await db
     .select({
-      id: min(votes.id),
-      voteNumber: sql<string | null>`COALESCE(
-        MAX(${votes.voteNumber}) FILTER (WHERE ${isFinal}),
-        MAX(${votes.voteNumber}) FILTER (WHERE ${isProvisional}),
-        MAX(${votes.voteNumber}) FILTER (WHERE ${isRejection}),
-        MAX(${votes.voteNumber})
-      )`,
-      title: votes.title,
-      titleEn: max(votes.titleEn),
-      date: max(votes.date),
-      voteChoice: sql<string>`COALESCE(
-        MAX(${votes.voteChoice}) FILTER (WHERE ${isFinal}),
-        MAX(${votes.voteChoice}) FILTER (WHERE ${isProvisional}),
-        MAX(${votes.voteChoice}) FILTER (WHERE ${isRejection}),
-        (ARRAY_AGG(${votes.voteChoice} ORDER BY ${votes.voteNumber} DESC))[1]
-      )`,
-      result: sql<string | null>`COALESCE(
-        MAX(${votes.result}) FILTER (WHERE ${isFinal}),
-        MAX(${votes.result}) FILTER (WHERE ${isProvisional}),
-        MAX(${votes.result}) FILTER (WHERE ${isRejection}),
-        MAX(${votes.result})
-      )`,
-      votesFor: sql<number | null>`COALESCE(
-        MAX(${votes.votesFor}) FILTER (WHERE ${isFinal}),
-        MAX(${votes.votesFor}) FILTER (WHERE ${isProvisional}),
-        MAX(${votes.votesFor}) FILTER (WHERE ${isRejection}),
-        MAX(${votes.votesFor})
-      )`,
-      votesAgainst: sql<number | null>`COALESCE(
-        MAX(${votes.votesAgainst}) FILTER (WHERE ${isFinal}),
-        MAX(${votes.votesAgainst}) FILTER (WHERE ${isProvisional}),
-        MAX(${votes.votesAgainst}) FILTER (WHERE ${isRejection}),
-        MAX(${votes.votesAgainst})
-      )`,
-      votesAbstain: sql<number | null>`COALESCE(
-        MAX(${votes.votesAbstain}) FILTER (WHERE ${isFinal}),
-        MAX(${votes.votesAbstain}) FILTER (WHERE ${isProvisional}),
-        MAX(${votes.votesAbstain}) FILTER (WHERE ${isRejection}),
-        MAX(${votes.votesAbstain})
-      )`,
-      starsPoland: sql<number | null>`COALESCE(
-        MAX(${votes.starsPoland}) FILTER (WHERE ${isFinal}),
-        MAX(${votes.starsPoland}) FILTER (WHERE ${isProvisional}),
-        MAX(${votes.starsPoland}) FILTER (WHERE ${isRejection}),
-        MAX(${votes.starsPoland})
-      )`,
-      sessionId: votes.sessionId,
-      relatedCount: sql<number>`GREATEST(COUNT(*) - 1, 0)::int`,
+      id: voteItems.id,
+      voteNumber: voteItems.voteNumber,
+      title: voteItems.title,
+      titleEn: voteItems.titleEn,
+      date: voteItems.date,
+      voteChoice: votes.voteChoice,
+      result: voteItems.result,
+      votesFor: voteItems.votesFor,
+      votesAgainst: voteItems.votesAgainst,
+      votesAbstain: voteItems.votesAbstain,
+      starsPoland: voteItems.starsPoland,
+      sessionId: voteItems.sessionId,
+      relatedCount: voteItems.relatedCount,
     })
     .from(votes)
+    .innerJoin(voteItems, eq(votes.voteItemId, voteItems.id))
     .where(
       and(
         eq(votes.mepId, mepId),
-        eq(votes.isMain, true),
-        sql`EXTRACT(YEAR FROM ${votes.date}) = ${year}`,
-        sql`EXTRACT(MONTH FROM ${votes.date}) = ${month}`,
+        eq(voteItems.isRepresentative, true),
+        sql`EXTRACT(YEAR FROM ${voteItems.date}) = ${year}`,
+        sql`EXTRACT(MONTH FROM ${voteItems.date}) = ${month}`,
       ),
     )
-    .groupBy(votes.title, votes.sessionId)
-    .orderBy(sql`MAX(${votes.voteNumber}) ASC`)
+    .orderBy(asc(voteItems.voteNumber))
 
   return votesList.map((v) => ({
     ...v,
@@ -1006,6 +820,7 @@ export async function getMepVotesByMonth(
     title: v.title ?? '',
     titleEn: v.titleEn ?? '',
     date: v.date ?? new Date(),
+    sessionId: v.sessionId ?? 0,
   }))
 }
 

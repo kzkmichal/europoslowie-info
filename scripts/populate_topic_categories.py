@@ -63,7 +63,7 @@ def get_doc_refs_to_process(db_session: Session, limit: Optional[int] = None):
     """
     sql = text("""
         SELECT DISTINCT document_reference
-        FROM votes
+        FROM vote_items
         WHERE topic_category IS NULL
           AND document_reference IS NOT NULL
         ORDER BY document_reference
@@ -80,10 +80,10 @@ def get_oeil_votes_to_process(db_session: Session, limit: Optional[int] = None):
     sql = text("""
         SELECT DISTINCT vs.vote_number, vs.url AS oeil_url
         FROM vote_sources vs
-        JOIN votes v ON v.vote_number = vs.vote_number
+        JOIN vote_items vi ON vi.vote_number = vs.vote_number
         WHERE vs.source_type = 'PROCEDURE_OEIL'
-          AND v.topic_category IS NULL
-          AND v.is_main = true
+          AND vi.topic_category IS NULL
+          AND vi.is_main = true
         ORDER BY vs.vote_number
     """ + (f" LIMIT {int(limit)}" if limit else ""))
     rows = db_session.execute(sql).fetchall()
@@ -155,12 +155,12 @@ def run_pass1(engine, votes_scraper: VotesScraper, limit: Optional[int], dry_run
         logger.info(f"  -> topic: {topic}")
 
         if dry_run:
-            logger.info(f"  -> [DRY RUN] would UPDATE votes SET topic_category='{topic}' WHERE document_reference='{doc_ref}'")
+            logger.info(f"  -> [DRY RUN] would UPDATE vote_items SET topic_category='{topic}' WHERE document_reference='{doc_ref}'")
         else:
             with Session(engine) as db_session:
                 result = db_session.execute(
                     text("""
-                        UPDATE votes
+                        UPDATE vote_items
                         SET topic_category = :topic
                         WHERE document_reference = :doc_ref
                           AND topic_category IS NULL
@@ -218,12 +218,12 @@ def run_pass2(engine, votes_scraper: VotesScraper, sources_scraper: SourcesScrap
         logger.info(f"  -> committee={committee_code} → topic={topic}")
 
         if dry_run:
-            logger.info(f"  -> [DRY RUN] would UPDATE votes SET topic_category='{topic}' WHERE vote_number='{vote_number}'")
+            logger.info(f"  -> [DRY RUN] would UPDATE vote_items SET topic_category='{topic}' WHERE vote_number='{vote_number}'")
         else:
             with Session(engine) as db_session:
                 result = db_session.execute(
                     text("""
-                        UPDATE votes
+                        UPDATE vote_items
                         SET topic_category = :topic
                         WHERE vote_number = :vote_number
                           AND topic_category IS NULL

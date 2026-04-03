@@ -25,6 +25,7 @@ POLISH_PARTIES = {
     'org/7020': 'Koalicja Obywatelska (KO)',
     'org/7029': 'Konfederacja Korony Polskiej (KKP)',  # Verified: Grzegorz BRAUN (far-right)
     'org/9675': 'Koalicja Obywatelska (KO)',
+    'org/7979': 'Koalicja Obywatelska (KO)',  # Verified: Bogdan ZDROJEWSKI, Dariusz JOŃSKI
 }
 
 # EP Political Groups

@@ -46,8 +46,8 @@ SELECT
 FROM (
     SELECT
         v.mep_id,
-        EXTRACT(YEAR  FROM v.date)::int AS year,
-        EXTRACT(MONTH FROM v.date)::int AS month,
+        EXTRACT(YEAR  FROM vi.date)::int AS year,
+        EXTRACT(MONTH FROM vi.date)::int AS month,
         COUNT(*)                                      AS total_votes,
         COUNT(*) FILTER (WHERE v.vote_choice = 'FOR')     AS votes_for,
         COUNT(*) FILTER (WHERE v.vote_choice = 'AGAINST') AS votes_against,
@@ -59,8 +59,9 @@ FROM (
             2
         ) AS attendance_rate
     FROM votes v
+    JOIN vote_items vi ON vi.id = v.vote_item_id
     JOIN meps m ON m.id = v.mep_id
-    WHERE v.is_main = TRUE
+    WHERE vi.is_main = TRUE
       AND m.is_active = TRUE
     GROUP BY v.mep_id, year, month
 ) base
@@ -82,13 +83,14 @@ def calculate_and_save_stats() -> None:
         # Preview what will be calculated
         preview = session.execute(text("""
             SELECT
-                EXTRACT(YEAR  FROM v.date)::int AS year,
-                EXTRACT(MONTH FROM v.date)::int AS month,
+                EXTRACT(YEAR  FROM vi.date)::int AS year,
+                EXTRACT(MONTH FROM vi.date)::int AS month,
                 COUNT(DISTINCT v.mep_id) AS mep_count,
                 COUNT(*) AS vote_count
             FROM votes v
+            JOIN vote_items vi ON vi.id = v.vote_item_id
             JOIN meps m ON m.id = v.mep_id
-            WHERE v.is_main = TRUE AND m.is_active = TRUE
+            WHERE vi.is_main = TRUE AND m.is_active = TRUE
             GROUP BY year, month
             ORDER BY year DESC, month DESC
         """)).fetchall()
