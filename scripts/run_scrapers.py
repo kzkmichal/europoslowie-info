@@ -179,6 +179,20 @@ def main():
                 logger.info("Inserting sessions into database...")
                 session_ids = DatabaseWriter.upsert_voting_sessions(valid_sessions)
 
+                # Build mapping: session_number -> list of meeting day IDs for votes scraper
+                session_meeting_days = {
+                    s['session_number']: s.get('meeting_day_ids', [s['session_number']])
+                    for s in valid_sessions
+                }
+
+                # Extend session_ids so meeting day IDs also resolve to the DB session id
+                # (votes scraper stores meeting_id like "MTG-PL-2026-03-09" in each vote)
+                for snum, day_ids in session_meeting_days.items():
+                    db_id = session_ids.get(snum)
+                    if db_id:
+                        for mid in day_ids:
+                            session_ids[mid] = db_id
+
                 logger.info(f"✓ Sessions: {len(session_ids)} inserted/updated")
                 logger.info("")
         else:
@@ -189,6 +203,7 @@ def main():
             # TODO: Implement fetching existing sessions from database
             logger.warning("Need to fetch existing sessions from database...")
             session_ids = {}
+            session_meeting_days = {}
 
         # ====================================================================
         # STEP 3: Scrape and insert votes
@@ -207,10 +222,17 @@ def main():
                     # Scrape votes for each session
                     for session_number in session_ids.keys():
                         logger.info(f"Processing session: {session_number}")
-                        logger.info("  Fetching voting results...")
 
-                        # Scrape votes
-                        votes = votes_scraper.scrape(session_number=session_number)
+                        meeting_days = session_meeting_days.get(session_number, [session_number])
+                        all_votes: list = []
+
+                        for meeting_id in meeting_days:
+                            logger.info(f"  Fetching voting results for {meeting_id}...")
+                            day_votes = votes_scraper.scrape(meeting_id=meeting_id)
+                            if day_votes:
+                                all_votes.extend(day_votes)
+
+                        votes = all_votes
 
                         if not votes:
                             logger.warning(

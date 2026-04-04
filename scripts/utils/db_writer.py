@@ -136,7 +136,7 @@ class DatabaseWriter:
                         'location': session_data.get('location'),
                         'session_type': session_data.get('session_type', 'PLENARY'),
                         'total_votes': session_data.get('total_votes', 0),
-                        'status': session_data.get('status', 'COMPLETED')
+                        'status': session_data.get('status', 'completed').lower()
                     })
 
                     session_id = result.scalar()
@@ -190,7 +190,7 @@ class DatabaseWriter:
         with get_db_session() as db_session:
             for vote in votes:
                 try:
-                    session_number = vote.get('session_number')
+                    session_number = vote.get('meeting_id') or vote.get('session_number')
                     session_id = session_ids.get(session_number)
 
                     if not session_id:
@@ -201,8 +201,9 @@ class DatabaseWriter:
                         continue
 
                     mep_id = None
-                    if vote.get('mep_ep_id'):
-                        mep_id = mep_id_map.get(vote['mep_ep_id'])
+                    ep_id = vote.get('person_id') or vote.get('mep_ep_id')
+                    if ep_id:
+                        mep_id = mep_id_map.get(ep_id)
 
                     if not mep_id and vote.get('mep_name'):
                         mep_id = DatabaseWriter._find_mep_by_name(
@@ -275,6 +276,8 @@ class DatabaseWriter:
                     logger.error(
                         f"Failed to insert vote {vote.get('vote_number')}: {e}"
                     )
+                    db_session.rollback()
+                    skipped += 1
                     continue
 
             db_session.commit()
