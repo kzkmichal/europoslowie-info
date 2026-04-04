@@ -128,6 +128,7 @@ def get_votes_needing_description(
         FROM vote_sources vs
         JOIN vote_items vi ON vi.vote_number = vs.vote_number
         WHERE vs.source_type = 'OEIL_SUMMARY'
+          AND vi.is_representative = true
           {extra}
           {no_desc_filter}
         ORDER BY vs.vote_number, vs.id

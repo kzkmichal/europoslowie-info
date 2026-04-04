@@ -81,9 +81,8 @@ def get_votes_to_process(
                 v.vote_number,
                 v.dec_label,
                 v.document_reference,
-                vs.session_number
-            FROM votes v
-            JOIN voting_sessions vs ON v.session_id = vs.id
+                v.date AS vote_date
+            FROM vote_items v
             WHERE v.vote_number IS NOT NULL
               AND v.vote_number = :vote_number
             ORDER BY v.vote_number, v.id
@@ -97,9 +96,8 @@ def get_votes_to_process(
                 v.vote_number,
                 v.dec_label,
                 v.document_reference,
-                vs.session_number
-            FROM votes v
-            JOIN voting_sessions vs ON v.session_id = vs.id
+                v.date AS vote_date
+            FROM vote_items v
             WHERE v.vote_number IS NOT NULL
             ORDER BY v.vote_number, v.id
         """)
@@ -110,7 +108,7 @@ def get_votes_to_process(
             'vote_number':        row.vote_number,
             'dec_label':          row.dec_label,
             'document_reference': row.document_reference,
-            'session_number':     row.session_number,
+            'session_number':     str(row.vote_date) if row.vote_date else '',
         }
         for row in rows
     ]
@@ -156,7 +154,7 @@ def get_votes_needing_summary(
             vs.url         AS procedure_url,
             v.date         AS vote_date
         FROM vote_sources vs
-        JOIN votes v ON v.vote_number = vs.vote_number
+        JOIN vote_items v ON v.vote_number = vs.vote_number
         WHERE vs.source_type = 'PROCEDURE_OEIL'
           {extra}
           AND vs.vote_number NOT IN (
@@ -217,7 +215,7 @@ def get_votes_needing_procedure(
             v.vote_number,
             v.dec_label,
             v.document_reference
-        FROM votes v
+        FROM vote_items v
         WHERE {where}
           AND v.vote_number NOT IN (
               SELECT DISTINCT vote_number

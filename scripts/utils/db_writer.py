@@ -186,6 +186,7 @@ class DatabaseWriter:
 
         count = 0
         skipped = 0
+        processed_vote_item_ids: set = set()
 
         with get_db_session() as db_session:
             for vote in votes:
@@ -220,11 +221,11 @@ class DatabaseWriter:
                         INSERT INTO vote_items (
                             vote_number, session_id, title, date, result,
                             votes_for, votes_against, votes_abstain,
-                            document_reference
+                            document_reference, is_main, dec_label
                         ) VALUES (
                             :vote_number, :session_id, :title, :date, :result,
                             :votes_for, :votes_against, :votes_abstain,
-                            :document_reference
+                            :document_reference, :is_main, :dec_label
                         )
                         ON CONFLICT (vote_number) DO UPDATE SET
                             session_id         = EXCLUDED.session_id,
@@ -235,6 +236,8 @@ class DatabaseWriter:
                             votes_against      = EXCLUDED.votes_against,
                             votes_abstain      = EXCLUDED.votes_abstain,
                             document_reference = EXCLUDED.document_reference,
+                            is_main            = EXCLUDED.is_main,
+                            dec_label          = EXCLUDED.dec_label,
                             updated_at         = NOW()
                         RETURNING id
                     """)
@@ -245,12 +248,15 @@ class DatabaseWriter:
                         'title': vote.get('title', 'No title')[:500],
                         'date': vote.get('date'),
                         'result': vote.get('result'),
-                        'votes_for': vote.get('total_for', 0),
-                        'votes_against': vote.get('total_against', 0),
-                        'votes_abstain': vote.get('total_abstain', 0),
+                        'votes_for': vote.get('votes_for') or vote.get('total_for', 0),
+                        'votes_against': vote.get('votes_against') or vote.get('total_against', 0),
+                        'votes_abstain': vote.get('votes_abstain') or vote.get('total_abstain', 0),
                         'document_reference': vote.get('document_reference'),
+                        'is_main': vote.get('is_main', False),
+                        'dec_label': vote.get('dec_label'),
                     })
                     vote_item_id = result.scalar()
+                    processed_vote_item_ids.add(vote_item_id)
 
                     # Step 2: Insert per-MEP vote row
                     insert_vote = text("""
@@ -281,6 +287,28 @@ class DatabaseWriter:
                     continue
 
             db_session.commit()
+
+            # Step 3: Fill ABSENT for Polish MEPs who didn't vote
+            if processed_vote_item_ids:
+                absent_sql = text("""
+                    INSERT INTO votes (vote_item_id, mep_id, vote_choice)
+                    SELECT vi_id, m.id, 'ABSENT'
+                    FROM unnest(:vote_item_ids) AS vi_id
+                    CROSS JOIN meps m
+                    WHERE m.is_active = true
+                      AND NOT EXISTS (
+                          SELECT 1 FROM votes v
+                          WHERE v.vote_item_id = vi_id AND v.mep_id = m.id
+                      )
+                    ON CONFLICT (vote_item_id, mep_id) DO NOTHING
+                """)
+                absent_result = db_session.execute(
+                    absent_sql,
+                    {'vote_item_ids': list(processed_vote_item_ids)}
+                )
+                db_session.commit()
+                logger.info(f"  Filled {absent_result.rowcount} ABSENT records")
+
             logger.info(
                 f"✓ Inserted {count} votes "
                 f"({skipped} skipped - non-Polish MEPs or missing data)"
