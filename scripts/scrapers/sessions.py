@@ -386,6 +386,8 @@ class VotingSessionsScraper(BaseScraper):
         # Total votes (sum of all vote items across all days)
         total_votes = sum(day['vote_count'] for day in days)
 
+        meeting_day_ids = [d['activity_id'] for d in days if d.get('activity_id')]
+
         return {
             'session_number': session_number,
             'start_date': start_date.isoformat(),
@@ -395,7 +397,8 @@ class VotingSessionsScraper(BaseScraper):
             'year': year,
             'month': month,
             'total_votes': total_votes,
-            'days_count': len(days)
+            'days_count': len(days),
+            'meeting_day_ids': meeting_day_ids,
         }
 
     def _parse_api_session(self, item: Dict) -> Optional[Dict[str, Any]]:
