@@ -8,7 +8,7 @@ export interface MEPWithStats {
   nationalParty: string
   epGroup: string
   latestStats: MonthlyStats | null
-  topVote: { id: number; title: string; starsPoland: number } | null
+  topVote: { id: number; title: string; polandScore: number } | null
 }
 
 export interface MEPProfile extends MEP {

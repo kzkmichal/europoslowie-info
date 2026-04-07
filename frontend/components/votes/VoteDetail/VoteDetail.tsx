@@ -42,7 +42,8 @@ export const VoteDetail = ({
     contextAi,
     voteDescription,
     topicCategory,
-    starsPoland,
+    polandScore,
+    polandRelevanceData,
     polishVotes,
     summary,
   } = voteDetails
@@ -93,7 +94,8 @@ export const VoteDetail = ({
                 isAiGenerated={!!parsedDescription}
                 sourceUrl={parsedDescription?.source_url ?? null}
                 topicCategory={topicCategory}
-                starsPoland={starsPoland}
+                polandScore={polandScore}
+                polandRelevanceData={polandRelevanceData}
               />
             )}
           </div>
@@ -116,7 +118,8 @@ export const VoteDetail = ({
               isAiGenerated={!!parsedDescription}
               sourceUrl={parsedDescription?.source_url ?? null}
               topicCategory={topicCategory}
-              starsPoland={starsPoland}
+              polandScore={polandScore}
+              polandRelevanceData={polandRelevanceData}
             />
           )}
         </>

@@ -10,7 +10,7 @@ type VoteCardVote = {
   title: string
   date: Date | null
   result?: string | null
-  starsPoland?: number | null
+  polandScore?: number | null
   topicCategory?: string | null
   relatedCount?: number | null
 }
@@ -46,9 +46,19 @@ export const VoteCard = ({
       <div>
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2 flex-wrap">
-{vote.topicCategory && (
+            {vote.topicCategory && (
               <Badge className="bg-secondary-container/50 text-on-secondary-container border-secondary-container uppercase tracking-tighter font-bold">
                 {vote.topicCategory}
+              </Badge>
+            )}
+            {vote.polandScore != null && vote.polandScore >= 70 && (
+              <Badge className="bg-red-100 text-red-800 border-red-200">
+                🔴 Kluczowe
+              </Badge>
+            )}
+            {vote.polandScore != null && vote.polandScore >= 40 && vote.polandScore < 70 && (
+              <Badge className="bg-yellow-100 text-yellow-800 border-yellow-200">
+                🟡 Istotne
               </Badge>
             )}
           </div>

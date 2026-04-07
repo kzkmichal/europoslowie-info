@@ -78,8 +78,18 @@ export const voteItems = pgTable('vote_items', {
   documentReference: varchar('document_reference', { length: 100 }),
   documentUrl: text('document_url'),
   contextAi: text('context_ai'),
-  starsPoland: integer('stars_poland'),
-  starsReasoning: jsonb('stars_reasoning').$type<string[]>(),
+  polandScore: integer('poland_score'),
+  polandRelevanceData: jsonb('poland_relevance_data').$type<{
+    relevance: 'kluczowe' | 'istotne' | 'neutralne'
+    score: number
+    reasoning: string
+    key_factors: string[]
+    low_confidence: boolean
+    is_sensitive?: boolean
+    auto_classified?: boolean
+    model?: string
+    generated_at?: string
+  }>(),
   argumentsFor: jsonb('arguments_for').$type<
     Array<{
       quote: string
