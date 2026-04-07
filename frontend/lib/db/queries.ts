@@ -54,7 +54,7 @@ type TopVoteRow = {
   mep_id: number
   id: number
   title: string
-  stars_poland: number | null
+  poland_score: number | null
 }
 
 export async function getAllMEPsWithStats(): Promise<MEPWithStats[]> {
@@ -69,10 +69,10 @@ export async function getAllMEPsWithStats(): Promise<MEPWithStats[]> {
     `) as Promise<LatestStatsRow[]>,
 
       db.execute(sql`
-      SELECT DISTINCT ON (v.mep_id) v.mep_id, vi.id, vi.title, vi.stars_poland
+      SELECT DISTINCT ON (v.mep_id) v.mep_id, vi.id, vi.title, vi.poland_score
       FROM votes v
       JOIN vote_items vi ON vi.id = v.vote_item_id
-      ORDER BY v.mep_id, vi.stars_poland DESC NULLS LAST, vi.date DESC
+      ORDER BY v.mep_id, vi.poland_score DESC NULLS LAST, vi.date DESC
     `) as Promise<TopVoteRow[]>,
 
       db
@@ -117,7 +117,7 @@ export async function getAllMEPsWithStats(): Promise<MEPWithStats[]> {
           }
         : null,
       topVote: v
-        ? { id: v.id, title: v.title, starsPoland: v.stars_poland }
+        ? { id: v.id, title: v.title, polandScore: v.poland_score }
         : null,
       committees: committeesByMepId.get(mep.id) ?? [],
     }
@@ -140,8 +140,8 @@ export async function getMepBySlug(slug: string): Promise<MEPProfile | null> {
     .select(getTableColumns(voteItems))
     .from(votes)
     .innerJoin(voteItems, eq(votes.voteItemId, voteItems.id))
-    .where(and(eq(votes.mepId, mep[0].id), sql`${voteItems.starsPoland} >= 4`))
-    .orderBy(desc(voteItems.starsPoland), desc(voteItems.date))
+    .where(and(eq(votes.mepId, mep[0].id), sql`${voteItems.polandScore} >= 40`))
+    .orderBy(desc(voteItems.polandScore), desc(voteItems.date))
     .limit(10)
 
   const committees = await db
@@ -233,7 +233,8 @@ export async function getVoteDetails(
       votesFor: voteItems.votesFor,
       votesAgainst: voteItems.votesAgainst,
       votesAbstain: voteItems.votesAbstain,
-      starsPoland: voteItems.starsPoland,
+      polandScore: voteItems.polandScore,
+      polandRelevanceData: voteItems.polandRelevanceData,
       documentReference: voteItems.documentReference,
       documentUrl: voteItems.documentUrl,
       contextAi: voteItems.contextAi,
@@ -309,7 +310,7 @@ export async function getTopVotesForMonth(
     .from(voteItems)
     .where(
       and(
-        eq(voteItems.starsPoland, 5),
+        sql`${voteItems.polandScore} >= 70`,
         sql`${voteItems.date} >= ${startDate}::date`,
         sql`${voteItems.date} <= ${endDate}::date`,
       ),
@@ -365,7 +366,7 @@ export async function getMepVotes(
         votesFor: voteItems.votesFor,
         votesAgainst: voteItems.votesAgainst,
         votesAbstain: voteItems.votesAbstain,
-        starsPoland: voteItems.starsPoland,
+        polandScore: voteItems.polandScore,
         sessionId: voteItems.sessionId,
         relatedCount: voteItems.relatedCount,
       })
@@ -456,7 +457,7 @@ async function _getVotesList(
       votesFor: voteItems.votesFor,
       votesAgainst: voteItems.votesAgainst,
       votesAbstain: voteItems.votesAbstain,
-      starsPoland: voteItems.starsPoland,
+      polandScore: voteItems.polandScore,
       polishVotesFor: voteItems.polishVotesFor,
       polishVotesAgainst: voteItems.polishVotesAgainst,
       polishVotesAbstain: voteItems.polishVotesAbstain,
@@ -658,7 +659,7 @@ export async function getMepVotesBySession(
       votesFor: voteItems.votesFor,
       votesAgainst: voteItems.votesAgainst,
       votesAbstain: voteItems.votesAbstain,
-      starsPoland: voteItems.starsPoland,
+      polandScore: voteItems.polandScore,
       sessionId: voteItems.sessionId,
       relatedCount: voteItems.relatedCount,
     })
@@ -798,7 +799,7 @@ export async function getMepVotesByMonth(
       votesFor: voteItems.votesFor,
       votesAgainst: voteItems.votesAgainst,
       votesAbstain: voteItems.votesAbstain,
-      starsPoland: voteItems.starsPoland,
+      polandScore: voteItems.polandScore,
       sessionId: voteItems.sessionId,
       relatedCount: voteItems.relatedCount,
     })

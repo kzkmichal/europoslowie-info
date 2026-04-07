@@ -41,7 +41,7 @@ export type MEPWithStats = MEP & {
   topVote: {
     id: number
     title: string
-    starsPoland: number | null
+    polandScore: number | null
   } | null
   committees: CommitteeMembership[]
 }
@@ -140,7 +140,7 @@ export type MEPVote = {
   votesFor: number | null
   votesAgainst: number | null
   votesAbstain: number | null
-  starsPoland: number | null
+  polandScore: number | null
   sessionId: number
   relatedCount?: number
 }
@@ -197,7 +197,14 @@ export type VoteDetailsById = {
   votesFor: number | null
   votesAgainst: number | null
   votesAbstain: number | null
-  starsPoland: number | null
+  polandScore: number | null
+  polandRelevanceData?: {
+    relevance: 'kluczowe' | 'istotne' | 'neutralne'
+    score: number
+    reasoning: string
+    key_factors: string[]
+    low_confidence: boolean
+  } | null
   documentReference: string | null
   documentUrl: string | null
   contextAi: string | null
@@ -254,7 +261,7 @@ export type VoteListItem = {
   votesFor: number | null
   votesAgainst: number | null
   votesAbstain: number | null
-  starsPoland: number | null
+  polandScore: number | null
   polishVotesFor: number | null
   polishVotesAgainst: number | null
   polishVotesAbstain: number | null

@@ -51,7 +51,7 @@ export default async function TopVotesPage() {
             <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
               {votes.map((vote, index) => (
                 <div key={vote.id} className="relative">
-                  {vote.starsPoland !== null && vote.starsPoland >= 4 && (
+                  {vote.polandScore !== null && vote.polandScore !== undefined && vote.polandScore >= 70 && (
                     <div className="absolute -left-2 -top-2 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-yellow-500 text-sm font-bold text-white shadow-lg">
                       {index + 1}
                     </div>
