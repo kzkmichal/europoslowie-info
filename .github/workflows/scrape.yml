@@ -48,3 +48,9 @@ jobs:
         run: python scripts/populate_representative_votes.py
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+      - name: Populate Poland relevance scores
+        run: python scripts/populate_poland_relevance.py
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
