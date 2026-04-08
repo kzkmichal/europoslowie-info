@@ -3,7 +3,14 @@ name: Monthly Data Update
 on:
   schedule:
     - cron: '0 3 20 * *'  # 20. każdego miesiąca, 3:00 UTC
-  workflow_dispatch:        # ręczne uruchomienie
+  workflow_dispatch:
+    inputs:
+      year:
+        description: 'Year (default: current)'
+        required: false
+      month:
+        description: 'Month (default: current, 1-12)'
+        required: false
 
 jobs:
   scrape:
@@ -21,19 +28,52 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Run scrapers
-        run: python scripts/run_scrapers.py
+      - name: Resolve date parameters
+        id: date
+        run: |
+          YEAR="${{ github.event.inputs.year }}"
+          MONTH="${{ github.event.inputs.month }}"
+          [ -z "$YEAR" ]  && YEAR=$(date +%Y)
+          [ -z "$MONTH" ] && MONTH=$(date +%-m)
+          FROM_DATE="${YEAR}-$(printf '%02d' $MONTH)-01"
+          echo "year=$YEAR"       >> $GITHUB_OUTPUT
+          echo "month=$MONTH"     >> $GITHUB_OUTPUT
+          echo "from_date=$FROM_DATE" >> $GITHUB_OUTPUT
+          echo "Resolved: year=$YEAR month=$MONTH from_date=$FROM_DATE"
+
+      - name: Run scrapers (sessions, votes, questions, speeches)
+        run: |
+          python scripts/run_scrapers.py \
+            --year ${{ steps.date.outputs.year }} \
+            --month ${{ steps.date.outputs.month }} \
+            --skip-meps \
+            --skip-committees
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
 
-      - name: Populate vote sources
-        run: python scripts/populate_vote_sources.py
+      - name: Populate representative votes
+        run: python scripts/populate_representative_votes.py
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
-      - name: Populate vote descriptions
-        run: python scripts/populate_vote_descriptions.py
+      - name: Populate vote sources — Tier 1 (RCV_XML, VOT_XML, REPORT)
+        run: python scripts/populate_vote_sources.py --from-date ${{ steps.date.outputs.from_date }}
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+      - name: Populate vote sources — Tier 2 (PROCEDURE_OEIL)
+        run: python scripts/populate_vote_sources.py --from-date ${{ steps.date.outputs.from_date }} --procedures-only
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+      - name: Populate vote sources — Tier 3 (OEIL_SUMMARY)
+        run: python scripts/populate_vote_sources.py --from-date ${{ steps.date.outputs.from_date }} --summaries-only
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+      - name: Populate vote descriptions (AI)
+        run: python scripts/populate_vote_descriptions.py --from-date ${{ steps.date.outputs.from_date }}
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
@@ -44,13 +84,8 @@ jobs:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
 
-      - name: Populate representative votes
-        run: python scripts/populate_representative_votes.py
-        env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-
-      - name: Populate Poland relevance scores
-        run: python scripts/populate_poland_relevance.py
+      - name: Populate Poland relevance scores (AI)
+        run: python scripts/populate_poland_relevance.py --from-date ${{ steps.date.outputs.from_date }}
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
