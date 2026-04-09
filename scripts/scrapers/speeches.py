@@ -21,7 +21,10 @@ class SpeechesScraper(BaseScraper):
         super().__init__(base_url=EP_API_BASE, rate_limit_seconds=2.0)
 
     def scrape(
-        self, mep_ep_ids: List[int], year: Optional[int] = None
+        self,
+        mep_ep_ids: List[int],
+        year: Optional[int] = None,
+        known_ids: Set[str] = None,
     ) -> List[Dict[str, Any]]:
         """
         Scrape speeches for every MEP in mep_ep_ids.
@@ -31,26 +34,32 @@ class SpeechesScraper(BaseScraper):
             year: If provided, only keep speeches from that calendar year.
                   The API has no server-side date filter, so filtering is done
                   client-side.
+            known_ids: ep_activity_ids already in the DB — skipped in results.
 
         Returns:
             List of speech dicts ready for upsert.
         """
+        known = known_ids or set()
         self.log_info(
             f"Starting speeches scrape for {len(mep_ep_ids)} MEPs"
             + (f" (year={year})" if year else " (all years)")
+            + (f", skipping {len(known)} known IDs" if known else "")
         )
         all_speeches = []
 
         for ep_id in mep_ep_ids:
-            speeches = self._scrape_for_mep(ep_id, year=year)
+            speeches = self._scrape_for_mep(ep_id, year=year, known=known)
             all_speeches.extend(speeches)
             self.stats['items_scraped'] += len(speeches)
-            self.log_info(f"  MEP {ep_id}: {len(speeches)} speeches")
+            self.log_info(f"  MEP {ep_id}: {len(speeches)} new speeches")
 
         return all_speeches
 
-    def _scrape_for_mep(self, ep_id: int, year: Optional[int] = None) -> List[Dict[str, Any]]:
+    def _scrape_for_mep(
+        self, ep_id: int, year: Optional[int] = None, known: set = None
+    ) -> List[Dict[str, Any]]:
         """Paginate through speeches for a single MEP."""
+        known = known or set()
         speeches = []
         offset = 0
         limit = 50
@@ -83,6 +92,8 @@ class SpeechesScraper(BaseScraper):
                     continue
                 # Client-side year filter (API has no date param for speeches)
                 if year and not str(speech['speech_date']).startswith(str(year)):
+                    continue
+                if speech['ep_activity_id'] in known:
                     continue
                 speeches.append(speech)
 

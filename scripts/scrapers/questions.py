@@ -29,7 +29,12 @@ class QuestionsScraper(BaseScraper):
     def __init__(self):
         super().__init__(base_url=EP_API_BASE, rate_limit_seconds=2.0)
 
-    def scrape(self, mep_ep_ids: Set[int], years: List[int]) -> List[Dict[str, Any]]:
+    def scrape(
+        self,
+        mep_ep_ids: Set[int],
+        years: List[int],
+        known_ids: Set[str] = None,
+    ) -> List[Dict[str, Any]]:
         """
         Scrape written questions for the given years, filtered to Polish MEPs.
 
@@ -39,13 +44,16 @@ class QuestionsScraper(BaseScraper):
         Args:
             mep_ep_ids: Set of EP numeric IDs for all active Polish MEPs.
             years: List of calendar years to scrape.
+            known_ids: Question identifiers already in the DB — Phase 2 skips these.
 
         Returns:
             List of question dicts ready for upsert.
         """
+        known = known_ids or set()
         self.log_info(
             f"Starting questions scrape for years={years}, "
             f"tracking {len(mep_ep_ids)} Polish MEPs"
+            + (f", skipping {len(known)} known IDs" if known else "")
         )
 
         all_questions = []
@@ -53,11 +61,12 @@ class QuestionsScraper(BaseScraper):
         for year in years:
             self.log_info(f"Phase 1 — collecting question IDs for {year}…")
             ids = self._collect_ids_for_year(year)
-            self.log_info(f"  Found {len(ids)} questions in {year}")
+            new_ids = [qid for qid in ids if qid not in known]
+            self.log_info(f"  Found {len(ids)} questions in {year}, {len(new_ids)} new")
 
-            self.log_info(f"Phase 2 — fetching details for {year}…")
+            self.log_info(f"Phase 2 — fetching details for {len(new_ids)} new questions…")
             count = 0
-            for qid in ids:
+            for qid in new_ids:
                 questions = self._fetch_question(qid, mep_ep_ids)
                 all_questions.extend(questions)
                 count += len(questions)

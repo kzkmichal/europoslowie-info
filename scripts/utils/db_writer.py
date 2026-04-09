@@ -479,6 +479,37 @@ class DatabaseWriter:
         return count
 
     @staticmethod
+    def get_existing_speech_ids(year: int) -> set:
+        """Return all ep_activity_ids already in DB for the given year."""
+        with get_db_session() as session:
+            rows = session.execute(text("""
+                SELECT DISTINCT ep_activity_id
+                FROM speeches
+                WHERE EXTRACT(YEAR FROM speech_date) = :year
+            """), {'year': year}).fetchall()
+        return {row.ep_activity_id for row in rows}
+
+    @staticmethod
+    def get_existing_document_ids() -> set:
+        """Return all ep_document_ids already in DB."""
+        with get_db_session() as session:
+            rows = session.execute(text(
+                "SELECT DISTINCT ep_document_id FROM mep_documents"
+            )).fetchall()
+        return {row.ep_document_id for row in rows}
+
+    @staticmethod
+    def get_existing_question_numbers(years: List[int]) -> set:
+        """Return question_numbers already in DB for the given years."""
+        with get_db_session() as session:
+            rows = session.execute(text("""
+                SELECT DISTINCT question_number
+                FROM questions
+                WHERE EXTRACT(YEAR FROM date_submitted) = ANY(:years)
+            """), {'years': years}).fetchall()
+        return {row.question_number for row in rows}
+
+    @staticmethod
     def backfill_monthly_stats_counts() -> None:
         """
         Update questions_count and speeches_count in monthly_stats based on
