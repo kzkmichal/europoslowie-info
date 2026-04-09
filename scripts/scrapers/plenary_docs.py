@@ -42,6 +42,7 @@ class PlenaryDocsScraper(BaseScraper):
         self,
         mep_ep_ids: List[int],
         years: Optional[List[int]] = None,
+        known_ids: Set[str] = None,
     ) -> List[Dict[str, Any]]:
         """
         Scrape plenary documents for all Polish MEPs.
@@ -49,16 +50,19 @@ class PlenaryDocsScraper(BaseScraper):
         Args:
             mep_ep_ids: List of EP numeric IDs for active Polish MEPs.
             years: Calendar years to scrape (default: all term years 2024-2026).
+            known_ids: Document identifiers already in the DB — Phase 2 skips these.
 
         Returns:
             List of document dicts ready for upsert.
         """
         mep_set: Set[int] = set(mep_ep_ids)
+        known = known_ids or set()
         target_years = years if years else TERM_YEARS
 
         self.log_info(
             f"Starting plenary docs scrape for {len(mep_set)} MEPs, "
             f"years={target_years}, work-types={WORK_TYPES}"
+            + (f", skipping {len(known)} known IDs" if known else "")
         )
         all_docs: List[Dict[str, Any]] = []
 
@@ -68,16 +72,19 @@ class PlenaryDocsScraper(BaseScraper):
                     f"Phase 1 — collecting identifiers: {work_type} / {year}"
                 )
                 identifiers = self._collect_identifiers(work_type, year)
-                self.log_info(f"  Found {len(identifiers)} documents")
+                new_identifiers = [i for i in identifiers if i not in known]
+                self.log_info(
+                    f"  Found {len(identifiers)}, {len(new_identifiers)} new"
+                )
 
-                if not identifiers:
+                if not new_identifiers:
                     continue
 
                 self.log_info(
-                    f"Phase 2 — fetching details for {len(identifiers)} docs …"
+                    f"Phase 2 — fetching details for {len(new_identifiers)} docs …"
                 )
                 found = 0
-                for identifier in identifiers:
+                for identifier in new_identifiers:
                     docs = self._fetch_detail_for_all_meps(
                         identifier, mep_set, work_type
                     )

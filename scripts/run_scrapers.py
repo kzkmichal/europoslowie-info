@@ -219,8 +219,9 @@ def main():
                 total_votes_inserted = 0
 
                 with VotesScraper() as votes_scraper:
-                    # Scrape votes for each session
-                    for session_number in session_ids.keys():
+                    # Scrape votes for each session (iterate session_meeting_days to
+                    # avoid processing meeting_day_id aliases added to session_ids)
+                    for session_number in session_meeting_days.keys():
                         logger.info(f"Processing session: {session_number}")
 
                         meeting_days = session_meeting_days.get(session_number, [session_number])
@@ -281,15 +282,14 @@ def main():
             if not mep_ep_ids:
                 logger.warning("No MEPs in database, skipping questions scraping.")
             else:
-                # Scrape current year and previous year to catch late-entered questions
-                years = list({now.year - 1, now.year})
-                if args.year:
-                    years = [args.year]
+                years = [args.year if args.year else now.year]
+                known_ids = DatabaseWriter.get_existing_question_numbers(years)
 
                 with QuestionsScraper() as questions_scraper:
                     questions = questions_scraper.scrape(
                         mep_ep_ids=mep_ep_ids,
                         years=years,
+                        known_ids=known_ids,
                     )
                     valid_questions = questions_scraper.validate(questions)
                     questions_scraper.print_summary()
@@ -316,10 +316,14 @@ def main():
             if not mep_ep_ids_list:
                 logger.warning("No MEPs in database, skipping speeches scraping.")
             else:
+                known_speech_ids = DatabaseWriter.get_existing_speech_ids(
+                    args.year if args.year else now.year
+                )
                 with SpeechesScraper() as speeches_scraper:
                     speeches = speeches_scraper.scrape(
                         mep_ep_ids=mep_ep_ids_list,
                         year=args.year if args.year else None,
+                        known_ids=known_speech_ids,
                     )
                     valid_speeches = speeches_scraper.validate(speeches)
                     speeches_scraper.print_summary()
@@ -346,10 +350,12 @@ def main():
             if not mep_ep_ids_list:
                 logger.warning("No MEPs in database, skipping documents scraping.")
             else:
+                known_doc_ids = DatabaseWriter.get_existing_document_ids()
                 with PlenaryDocsScraper() as docs_scraper:
                     docs = docs_scraper.scrape(
                         mep_ep_ids=mep_ep_ids_list,
                         years=[year] if args.year else None,
+                        known_ids=known_doc_ids,
                     )
                     valid_docs = docs_scraper.validate(docs)
                     docs_scraper.print_summary()
