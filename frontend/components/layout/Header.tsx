@@ -1,39 +1,22 @@
 import Link from 'next/link'
 import { Container } from '@/components/layout/Container'
-import { cn } from '@/lib/utils'
+import { NavLinks } from '@/components/layout/NavLinks'
 
-const navLinkStyles = cn(
-  'text-sm font-medium text-on-surface-variant',
-  'transition-colors hover:text-primary',
-)
-
-export function Header() {
+export const Header = () => {
   return (
-    <header className="sticky top-0 z-50 glass border-b border-outline-variant/15">
+    <header className="fixed top-0 w-full z-50 bg-surface-container-lowest/80 backdrop-blur-md shadow-sm">
       <Container>
-        <nav className="flex h-16 items-center justify-between">
+        <div className="flex justify-between items-center py-4">
           <Link
             href="/"
-            className="font-display text-xl font-bold tracking-tight text-primary"
+            className="font-display text-xl font-bold tracking-tighter text-primary"
           >
             Europosłowie.info
           </Link>
-          <div className="flex items-center gap-6">
-            <Link href="/" className={navLinkStyles}>
-              Posłowie
-            </Link>
-            <Link href="/glosowania" className={navLinkStyles}>
-              Głosowania
-            </Link>
-            <Link href="/metodologia" className={navLinkStyles}>
-              Metodologia
-            </Link>
-            <Link href="/o-projekcie" className={navLinkStyles}>
-              O projekcie
-            </Link>
-          </div>
-        </nav>
+          <NavLinks />
+        </div>
       </Container>
+      <div className="bg-outline-variant h-px opacity-15" />
     </header>
   )
 }
