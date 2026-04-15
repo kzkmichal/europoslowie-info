@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 
 const links = [
-  { href: '/', label: 'Europosłowie' },
+  { href: '/europoslowie', label: 'Europosłowie' },
   { href: '/glosowania', label: 'Głosowania' },
   { href: '/metodologia', label: 'Metodologia' },
   { href: '/o-projekcie', label: 'O projekcie' },
@@ -16,8 +16,7 @@ export const NavLinks = () => {
   return (
     <nav className="hidden md:flex items-center gap-8">
       {links.map(({ href, label }) => {
-        const isActive =
-          href === '/' ? pathname === '/' : pathname.startsWith(href)
+        const isActive = pathname.startsWith(href)
         return (
           <Link
             key={href}

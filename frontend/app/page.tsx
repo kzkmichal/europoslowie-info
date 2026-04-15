@@ -1,50 +1,42 @@
-import { Suspense } from 'react'
-import { getAllMEPsWithStats } from '@/lib/db/queries'
+import { getAllMEPsWithStats, getLastSession, getNextSession, getSiteStats } from '@/lib/db/queries'
 import { Container } from '@/components/layout/Container'
-import { MEPGrid } from '@/components/meps/MEPGrid'
+import { HeroSection } from '@/components/home/HeroSection'
+import { StatsCard } from '@/components/home/StatsCard'
+import { TrackedCard } from '@/components/home/TrackedCard'
+import { LastSessionCard } from '@/components/sessions/LastSessionCard'
+import { UpcomingSessionCard } from '@/components/sessions/UpcomingSessionCard'
 
-export const generateMetadata = () => {
-  const metadata = {
-    title: 'Polscy Europosłowie - Lista posłów w PE | Europosłowie.info',
-    description:
-      'Pełna lista 53 polskich europosłów w Parlamencie Europejskim. Sprawdź statystyki obecności, głosowania i aktywność każdego posła.',
-  }
+export const generateMetadata = () => ({
+  title: 'Europosłowie.info — Monitoring aktywności polskich europosłów',
+  description:
+    'Przejrzysta platforma monitorująca aktywność, głosowania i obecność polskich posłów w Parlamencie Europejskim.',
+})
 
-  return metadata
-}
 export default async function HomePage() {
-  const meps = await getAllMEPsWithStats()
+  const [meps, lastSession, nextSession, stats] = await Promise.all([
+    getAllMEPsWithStats(),
+    getLastSession(),
+    getNextSession(),
+    getSiteStats(),
+  ])
 
   return (
-    <div className="py-8">
-      <Container>
-        <div className="mb-8">
-          <h1 className="font-display text-4xl font-black text-on-surface">
-            Polscy <span className="text-primary">Europosłowie</span>
-          </h1>
-          <p className="mt-2 text-base font-medium text-on-surface-variant">
-            10. Kadencja Parlamentu Europejskiego (2024–2029)
-          </p>
-          <p className="mt-1 text-sm text-outline">
-            Śledzimy aktywność, głosowania i obecność {meps.length} polskich
-            posłów do PE
-          </p>
-        </div>
-        <Suspense
-          fallback={
-            <div className="py-8 text-center text-on-surface-variant">
-              Ładowanie...
-            </div>
-          }
-        >
-          <MEPGrid meps={meps} />
-        </Suspense>
-        {meps.length === 0 && (
-          <div className="rounded-lg border-2 border-dashed border-gray-300 p-12 text-center">
-            <p className="text-gray-600">Brak danych o posłach</p>
+    <div>
+      <HeroSection />
+
+      <section className="pb-12">
+        <Container>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+            <StatsCard mepsCount={meps.length} stats={stats} />
+            <TrackedCard />
           </div>
-        )}
-      </Container>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <LastSessionCard session={lastSession} />
+            <UpcomingSessionCard session={nextSession} />
+          </div>
+        </Container>
+      </section>
     </div>
   )
 }
