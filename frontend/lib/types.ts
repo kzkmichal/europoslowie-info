@@ -282,6 +282,45 @@ export type VotesList = {
   hasMore: boolean
 }
 
+export type SessionItem = {
+  startDate: Date
+  endDate: Date
+  location: string | null
+  sessionType: string | null
+  totalVotes: number
+  adoptedVotes: number
+  rejectedVotes: number
+  keyVotes: number
+  importantVotes: number
+}
+
+/**
+ * All sessions from the last month with per-session vote counts
+ * Used by: getLastSession() -> Homepage
+ */
+export type LastSessionData = {
+  year: number
+  month: number
+  sessions: SessionItem[]
+} | null
+
+export type UpcomingSessionItem = {
+  startDate: Date
+  endDate: Date
+  location: string | null
+  sessionType: string | null
+}
+
+/**
+ * All sessions from the next upcoming month
+ * Used by: getNextSession() -> Homepage
+ */
+export type UpcomingSessionData = {
+  year: number
+  month: number
+  sessions: UpcomingSessionItem[]
+} | null
+
 // ==============================================================================
 // Utility Types
 // ==============================================================================

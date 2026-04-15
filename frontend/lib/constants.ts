@@ -12,13 +12,40 @@ export const MONTHS_PL = [
   'Listopad',
   'Grudzień',
 ]
-
-export const MONTHS_PL_ABBR = [
-  'sty', 'lut', 'mar', 'kwi', 'maj', 'cze',
-  'lip', 'sie', 'wrz', 'paź', 'lis', 'gru',
+export const DAY_FULL_PL = [
+  'Niedziela',
+  'Poniedziałek',
+  'Wtorek',
+  'Środa',
+  'Czwartek',
+  'Piątek',
+  'Sobota',
 ]
 
-export const DAY_NAMES_PL = ['niedz.', 'pon.', 'wt.', 'śr.', 'czw.', 'pt.', 'sob.']
+export const MONTHS_PL_ABBR = [
+  'sty',
+  'lut',
+  'mar',
+  'kwi',
+  'maj',
+  'cze',
+  'lip',
+  'sie',
+  'wrz',
+  'paź',
+  'lis',
+  'gru',
+]
+
+export const DAY_NAMES_PL = [
+  'niedz.',
+  'pon.',
+  'wt.',
+  'śr.',
+  'czw.',
+  'pt.',
+  'sob.',
+]
 
 export const getAttendanceColor = (rate: number): string => {
   if (rate >= 90) return '#002D62'

@@ -27,6 +27,10 @@ import type {
   MEPActivityMonthSummary,
   MEPVote,
   VoteSource,
+  LastSessionData,
+  UpcomingSessionData,
+  SessionItem,
+  UpcomingSessionItem,
 } from '../types'
 import type { VoteItem, Question, Speech, MepDocument } from './schema'
 
@@ -924,4 +928,147 @@ export async function getMepDocuments(slug: string): Promise<MepDocument[]> {
     .from(mepDocuments)
     .where(eq(mepDocuments.mepId, mep[0].id))
     .orderBy(desc(mepDocuments.documentDate))
+}
+
+export type SiteStats = {
+  sessionsCount: number
+  votesCount: number
+  committeesCount: number
+  epGroupsCount: number
+}
+
+export async function getSiteStats(): Promise<SiteStats> {
+  const rows = await db.execute(sql`
+    SELECT
+      (SELECT COUNT(*)              FROM voting_sessions      WHERE status = 'completed')    AS sessions_count,
+      (SELECT COUNT(*)              FROM vote_items           WHERE is_representative = true) AS votes_count,
+      (SELECT COUNT(DISTINCT committee_code) FROM committee_memberships WHERE is_current = true) AS committees_count,
+      (SELECT COUNT(DISTINCT ep_group) FROM meps             WHERE is_active = true AND ep_group IS NOT NULL) AS ep_groups_count
+  `) as { sessions_count: string; votes_count: string; committees_count: string; ep_groups_count: string }[]
+  const r = rows[0]
+  return {
+    sessionsCount: Number(r?.sessions_count ?? 0),
+    votesCount: Number(r?.votes_count ?? 0),
+    committeesCount: Number(r?.committees_count ?? 0),
+    epGroupsCount: Number(r?.ep_groups_count ?? 0),
+  }
+}
+
+type LastSessionRow = {
+  start_date: Date
+  end_date: Date
+  location: string | null
+  session_type: string | null
+  total_votes: string | null
+  adopted_votes: string | null
+  rejected_votes: string | null
+  key_votes: string | null
+  important_votes: string | null
+  yr: string
+  mo: string
+}
+
+export async function getLastSession(): Promise<LastSessionData> {
+  const rows = await db.execute(sql`
+    WITH last_month AS (
+      SELECT EXTRACT(YEAR FROM vs.end_date) AS yr, EXTRACT(MONTH FROM vs.end_date) AS mo
+      FROM voting_sessions vs
+      INNER JOIN vote_items vi ON vi.session_id = vs.id
+      WHERE vs.end_date <= CURRENT_DATE
+      GROUP BY 1, 2
+      HAVING COUNT(vi.id) > 0
+      ORDER BY yr DESC, mo DESC
+      LIMIT 1
+    )
+    SELECT
+      MIN(vs.start_date)   AS start_date,
+      MAX(vs.end_date)     AS end_date,
+      MAX(vs.location)     AS location,
+      MAX(vs.session_type) AS session_type,
+      lm.yr,
+      lm.mo,
+      COUNT(vi.id) FILTER (WHERE vi.is_representative = true) AS total_votes,
+      COUNT(vi.id) FILTER (WHERE vi.result = 'ADOPTED'  AND vi.is_representative = true) AS adopted_votes,
+      COUNT(vi.id) FILTER (WHERE vi.result = 'REJECTED' AND vi.is_representative = true) AS rejected_votes,
+      COUNT(vi.id) FILTER (WHERE vi.poland_score >= 70  AND vi.is_representative = true) AS key_votes,
+      COUNT(vi.id) FILTER (WHERE vi.poland_score >= 40 AND vi.poland_score < 70 AND vi.is_representative = true) AS important_votes
+    FROM voting_sessions vs
+    INNER JOIN last_month lm
+      ON EXTRACT(YEAR  FROM vs.end_date) = lm.yr
+     AND EXTRACT(MONTH FROM vs.end_date) = lm.mo
+    LEFT JOIN vote_items vi ON vi.session_id = vs.id
+    WHERE vs.end_date <= CURRENT_DATE
+    GROUP BY DATE_TRUNC('week', vs.start_date), lm.yr, lm.mo
+    ORDER BY MIN(vs.start_date) ASC
+  `) as LastSessionRow[]
+
+  if (!rows.length) return null
+
+  const sessions: SessionItem[] = rows.map((r) => ({
+    startDate: new Date(r.start_date),
+    endDate: new Date(r.end_date),
+    location: r.location,
+    sessionType: r.session_type,
+    totalVotes: Number(r.total_votes ?? 0),
+    adoptedVotes: Number(r.adopted_votes ?? 0),
+    rejectedVotes: Number(r.rejected_votes ?? 0),
+    keyVotes: Number(r.key_votes ?? 0),
+    importantVotes: Number(r.important_votes ?? 0),
+  }))
+
+  return {
+    year: Number(rows[0].yr),
+    month: Number(rows[0].mo),
+    sessions,
+  }
+}
+
+type NextSessionRow = {
+  start_date: Date
+  end_date: Date
+  location: string | null
+  session_type: string | null
+  yr: string
+  mo: string
+}
+
+export async function getNextSession(): Promise<UpcomingSessionData> {
+  const rows = await db.execute(sql`
+    WITH next_month AS (
+      SELECT EXTRACT(YEAR FROM start_date) AS yr, EXTRACT(MONTH FROM start_date) AS mo
+      FROM voting_sessions
+      WHERE start_date > CURRENT_DATE
+      ORDER BY start_date ASC
+      LIMIT 1
+    )
+    SELECT
+      MIN(vs.start_date)   AS start_date,
+      MAX(vs.end_date)     AS end_date,
+      MAX(vs.location)     AS location,
+      MAX(vs.session_type) AS session_type,
+      nm.yr,
+      nm.mo
+    FROM voting_sessions vs
+    INNER JOIN next_month nm
+      ON EXTRACT(YEAR  FROM vs.start_date) = nm.yr
+     AND EXTRACT(MONTH FROM vs.start_date) = nm.mo
+    WHERE vs.start_date > CURRENT_DATE
+    GROUP BY DATE_TRUNC('week', vs.start_date), nm.yr, nm.mo
+    ORDER BY MIN(vs.start_date) ASC
+  `) as NextSessionRow[]
+
+  if (!rows.length || !rows[0].start_date) return null
+
+  const sessions: UpcomingSessionItem[] = rows.map((r) => ({
+    startDate: new Date(r.start_date),
+    endDate: new Date(r.end_date),
+    location: r.location,
+    sessionType: r.session_type,
+  }))
+
+  return {
+    year: Number(rows[0].yr),
+    month: Number(rows[0].mo),
+    sessions,
+  }
 }
