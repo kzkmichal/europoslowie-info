@@ -1,7 +1,7 @@
 """MEP speeches scraper using EP Open Data API v2."""
 import xml.etree.ElementTree as ET
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Set
 
 from .base import BaseScraper
 
