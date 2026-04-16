@@ -119,7 +119,7 @@ export const MEPGrid = ({ meps }: MEPSGridProps) => {
         <div className="flex flex-wrap items-center gap-2">
         <Input
           placeholder="Szukaj posła..."
-          className="w-48 h-10 border-outline-variant/50 bg-surface-container-lowest placeholder:text-on-surface-variant/40"
+          className="w-full sm:w-48 h-10 border-outline-variant/50 bg-surface-container-lowest placeholder:text-on-surface-variant/40"
           type="search"
           value={filters.search}
           onChange={handleSearchChange}

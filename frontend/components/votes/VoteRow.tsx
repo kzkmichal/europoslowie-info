@@ -77,17 +77,31 @@ export const VoteRow = ({ vote }: VoteRowProps) => {
 
         <h4 className="text-primary text-lg">{vote.title}</h4>
 
-        {vote.result && (
-          <div className="flex items-center gap-2">
-            <p className="text-sm text-outline">Wynik ogólny:</p>
-            <Badge
-              variant={vote.result === 'ADOPTED' ? 'voteFor' : 'voteAgainst'}
-              className="px-3 py-1 text-sm"
-            >
-              {vote.result === 'ADOPTED' ? 'Przyjęto' : 'Odrzucono'}
+        <div className="flex items-center gap-3 flex-wrap">
+          {vote.result && (
+            <div className="flex items-center gap-2">
+              <p className="text-sm text-outline">Wynik ogólny:</p>
+              <Badge
+                variant={vote.result === 'ADOPTED' ? 'voteFor' : 'voteAgainst'}
+                className="px-3 py-1 text-sm"
+              >
+                {vote.result === 'ADOPTED' ? 'Przyjęto' : 'Odrzucono'}
+              </Badge>
+            </div>
+          )}
+          {vote.polandScore != null && vote.polandScore >= 70 && (
+            <Badge className="bg-red-100 text-red-800 border-red-200">
+              🔴 Kluczowe
             </Badge>
-          </div>
-        )}
+          )}
+          {vote.polandScore != null &&
+            vote.polandScore >= 40 &&
+            vote.polandScore < 70 && (
+              <Badge className="bg-yellow-100 text-yellow-800 border-yellow-200">
+                🟡 Istotne
+              </Badge>
+            )}
+        </div>
       </div>
 
       <ChevronRight className="h-5 w-5 shrink-0 text-outline" />

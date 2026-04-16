@@ -67,9 +67,61 @@ export async function getAllMEPsWithStats(): Promise<MEPWithStats[]> {
       db.select().from(meps).where(eq(meps.isActive, true)),
 
       db.execute(sql`
-      SELECT DISTINCT ON (mep_id) *
-      FROM monthly_stats
-      ORDER BY mep_id, year DESC, month DESC
+      WITH global_latest AS (
+        SELECT
+          EXTRACT(YEAR FROM vs.end_date)::int AS yr,
+          EXTRACT(MONTH FROM vs.end_date)::int AS mo
+        FROM voting_sessions vs
+        INNER JOIN vote_items vi ON vi.session_id = vs.id
+        WHERE vs.end_date <= CURRENT_DATE
+        GROUP BY 1, 2
+        HAVING COUNT(vi.id) > 0
+        ORDER BY yr DESC, mo DESC
+        LIMIT 1
+      ),
+      dynamic_stats AS (
+        SELECT
+          v.mep_id,
+          lm.yr AS year,
+          lm.mo AS month,
+          COUNT(vi.id)::int AS total_votes,
+          COUNT(vi.id) FILTER (WHERE v.vote_choice = 'FOR')::int AS votes_for,
+          COUNT(vi.id) FILTER (WHERE v.vote_choice = 'AGAINST')::int AS votes_against,
+          COUNT(vi.id) FILTER (WHERE v.vote_choice = 'ABSTAIN')::int AS votes_abstain,
+          COUNT(vi.id) FILTER (WHERE v.vote_choice = 'ABSENT')::int AS votes_absent,
+          ROUND(
+            COUNT(vi.id) FILTER (WHERE v.vote_choice != 'ABSENT') * 100.0
+            / NULLIF(COUNT(vi.id), 0), 1
+          ) AS attendance_rate
+        FROM votes v
+        JOIN vote_items vi ON vi.id = v.vote_item_id AND vi.is_representative = true
+        JOIN voting_sessions vs ON vs.id = vi.session_id
+        CROSS JOIN global_latest lm
+        WHERE EXTRACT(YEAR FROM vs.end_date) = lm.yr
+          AND EXTRACT(MONTH FROM vs.end_date) = lm.mo
+        GROUP BY v.mep_id, lm.yr, lm.mo
+      )
+      SELECT
+        0 AS id,
+        d.mep_id,
+        d.year,
+        d.month,
+        d.total_votes,
+        d.votes_for,
+        d.votes_against,
+        d.votes_abstain,
+        d.votes_absent,
+        d.attendance_rate,
+        ms.questions_count,
+        ms.speeches_count,
+        ms.reports_count,
+        ms.ranking_among_poles,
+        ms.ranking_in_group,
+        ms.votes_poland_5star,
+        ms.votes_poland_4star
+      FROM dynamic_stats d
+      LEFT JOIN monthly_stats ms
+        ON ms.mep_id = d.mep_id AND ms.year = d.year AND ms.month = d.month
     `) as Promise<LatestStatsRow[]>,
 
       db.execute(sql`
@@ -138,7 +190,7 @@ export async function getMepBySlug(slug: string): Promise<MEPProfile | null> {
     .from(monthlyStats)
     .where(eq(monthlyStats.mepId, mep[0].id))
     .orderBy(desc(monthlyStats.year), desc(monthlyStats.month))
-    .limit(12)
+    .limit(24)
 
   const topVotes = await db
     .select(getTableColumns(voteItems))
@@ -764,16 +816,43 @@ export async function getMepActivityMonthList(
     .limit(1)
   if (!mep[0]) return []
 
-  return db
-    .select({
-      year: monthlyStats.year,
-      month: monthlyStats.month,
-      speechesCount: sql<number>`COALESCE(${monthlyStats.speechesCount}, 0)::int`,
-      questionsCount: sql<number>`COALESCE(${monthlyStats.questionsCount}, 0)::int`,
-    })
-    .from(monthlyStats)
-    .where(eq(monthlyStats.mepId, mep[0].id))
-    .orderBy(desc(monthlyStats.year), desc(monthlyStats.month))
+  const rows = await db.execute(sql`
+    SELECT
+      yr,
+      mo,
+      SUM(speeches_count)::int   AS speeches_count,
+      SUM(questions_count)::int  AS questions_count
+    FROM (
+      SELECT
+        EXTRACT(YEAR  FROM speech_date)::int AS yr,
+        EXTRACT(MONTH FROM speech_date)::int AS mo,
+        COUNT(*)                             AS speeches_count,
+        0                                    AS questions_count
+      FROM speeches
+      WHERE mep_id = ${mep[0].id}
+      GROUP BY 1, 2
+
+      UNION ALL
+
+      SELECT
+        EXTRACT(YEAR  FROM date_submitted)::int AS yr,
+        EXTRACT(MONTH FROM date_submitted)::int AS mo,
+        0                                       AS speeches_count,
+        COUNT(*)                                AS questions_count
+      FROM questions
+      WHERE mep_id = ${mep[0].id}
+      GROUP BY 1, 2
+    ) combined
+    GROUP BY yr, mo
+    ORDER BY yr DESC, mo DESC
+  `) as { yr: number; mo: number; speeches_count: number; questions_count: number }[]
+
+  return rows.map((r) => ({
+    year: Number(r.yr),
+    month: Number(r.mo),
+    speechesCount: Number(r.speeches_count),
+    questionsCount: Number(r.questions_count),
+  }))
 }
 
 export async function getMepVotesByMonth(
