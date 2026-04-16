@@ -54,9 +54,9 @@ export const UpcomingSessionCard = ({ session }: UpcomingSessionProps) => {
           </div>
         </div>
 
-        <div className="space-y-8">
+        <div className="space-y-4 sm:space-y-6">
           {sessions.map((s, i) => (
-            <div key={i} className="flex gap-6 items-center">
+            <div key={i} className="flex gap-4 items-center">
               <div className="shrink-0 w-20 h-20 bg-primary-foreground/5 border border-primary-foreground/10 rounded-2xl flex flex-col items-center justify-center gap-0.5">
                 <span className="text-[9px] font-black uppercase tracking-tighter text-primary-foreground/50 leading-none">
                   {MONTHS_PL[s.startDate.getMonth()]}

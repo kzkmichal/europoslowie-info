@@ -34,6 +34,7 @@ const ActivityMonthNav = ({
   const currentIndex = months.findIndex(
     (m) => m.year === currentYear && m.month === currentMonth,
   )
+  const validKey = currentIndex >= 0 ? currentKey : undefined
   const prevMonth = months[currentIndex - 1]
   const nextMonth = months[currentIndex + 1]
 
@@ -51,7 +52,7 @@ const ActivityMonthNav = ({
     <section className="mb-6">
       <div className="flex flex-wrap items-center gap-2">
         <Select
-          value={currentKey}
+          value={validKey}
           onValueChange={(value: string) => router.push(buildUrl(value))}
         >
           <SelectTrigger className="w-auto min-w-52">

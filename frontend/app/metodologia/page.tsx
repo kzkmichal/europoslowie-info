@@ -83,15 +83,15 @@ export default function MetodologiaPage() {
               </p>
               <ul className="list-none space-y-2 pl-0">
                 <li className="flex items-center gap-3">
-                  <span className="inline-block w-3 h-3 rounded-full bg-green-500 shrink-0" />
+                  <span className="inline-block w-3 h-3 rounded-full bg-primary-container shrink-0" />
                   <span><strong>Za</strong> — głos na "tak"</span>
                 </li>
                 <li className="flex items-center gap-3">
-                  <span className="inline-block w-3 h-3 rounded-full bg-red-500 shrink-0" />
+                  <span className="inline-block w-3 h-3 rounded-full bg-on-error-container shrink-0" />
                   <span><strong>Przeciw</strong> — głos na "nie"</span>
                 </li>
                 <li className="flex items-center gap-3">
-                  <span className="inline-block w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: '#ffb597' }} />
+                  <span className="inline-block w-3 h-3 rounded-full bg-on-tertiary-fixed-variant shrink-0" />
                   <span><strong>Wstrzymanie się</strong> — brak opowiedzenia się po żadnej stronie</span>
                 </li>
                 <li className="flex items-center gap-3">

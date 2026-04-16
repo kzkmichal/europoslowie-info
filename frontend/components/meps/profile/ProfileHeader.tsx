@@ -71,7 +71,7 @@ export const ProfileHeader = ({ mep, docsCount }: ProfileHeaderProps) => {
             </div>
           )}
 
-          <div className="flex flex-wrap items-center gap-6 pt-1 border-t border-outline-variant/20">
+          <div className="flex flex-wrap items-center gap-4 sm:gap-6 pt-1 border-t border-outline-variant/20">
             {[
               { label: 'Frekwencja', value: `${avgAttendance.toFixed(1)}%` },
               { label: 'Głosowań', value: totalVotes.toLocaleString('pl-PL') },

@@ -17,7 +17,7 @@ export const LastSessionCard = ({ session }: LastSessionCardProps) => {
 
   return (
     <div className="bg-surface-container-lowest rounded-2xl p-6 border border-outline-variant/20 shadow-ambient flex flex-col h-full">
-      <div className="flex justify-between items-center mb-6 pb-4 border-b border-outline-variant/10">
+      <div className="flex flex-wrap justify-between items-center gap-2 mb-6 pb-4 border-b border-outline-variant/10">
         <div className="flex items-center gap-3">
           <div className="w-2 h-8 bg-primary rounded-full shrink-0" />
           <div>
