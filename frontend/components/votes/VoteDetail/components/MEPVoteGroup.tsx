@@ -49,7 +49,7 @@ export const MEPVoteGroup = ({ votes, variant }: MEPVoteGroupProps) => {
         </div>
         <div className={cn('h-0.5 grow', lineColor)} />
       </div>
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
         {votes.map((vote) => (
           <Link
             key={vote.mep.id}

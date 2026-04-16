@@ -46,27 +46,27 @@ export const VoteRow = ({ vote }: VoteRowProps) => {
   const { tileBg, iconBg, labelColor, label, Icon } = choice
 
   const content = (
-    <div className="flex items-center gap-6 rounded-xl border border-transparent bg-surface-container-lowest p-4 transition-all duration-300 hover:border-outline-variant/30">
+    <div className="flex items-center gap-3 sm:gap-6 rounded-xl border border-transparent bg-surface-container-lowest p-3 sm:p-4 transition-all duration-300 hover:border-outline-variant/30">
       <div
         className={cn(
-          'flex min-w-[80px] flex-col items-center justify-center rounded-lg p-3 gap-2',
+          'flex min-w-[56px] sm:min-w-[80px] flex-col items-center justify-center rounded-lg p-2 sm:p-3 gap-1.5 sm:gap-2',
           tileBg,
         )}
       >
         <span
           className={cn(
-            'flex h-9 w-9 items-center justify-center rounded-full text-white',
+            'flex h-7 w-7 sm:h-9 sm:w-9 items-center justify-center rounded-full text-white',
             iconBg,
           )}
         >
-          <Icon className="h-5 w-5" strokeWidth={2.5} />
+          <Icon className="h-4 w-4 sm:h-5 sm:w-5" strokeWidth={2.5} />
         </span>
-        <span className={cn('text-xs font-black uppercase', labelColor)}>
+        <span className={cn('text-[10px] sm:text-xs font-black uppercase', labelColor)}>
           {label}
         </span>
       </div>
 
-      <div className="min-w-0 flex-1 space-y-2">
+      <div className="min-w-0 flex-1 space-y-1.5 sm:space-y-2">
         {vote.relatedCount != null && vote.relatedCount > 0 && (
           <div className="flex items-center gap-2">
             <span className="text-xs font-bold text-outline">
@@ -75,36 +75,36 @@ export const VoteRow = ({ vote }: VoteRowProps) => {
           </div>
         )}
 
-        <h4 className="text-primary text-lg">{vote.title}</h4>
+        <h4 className="text-primary text-sm sm:text-lg">{vote.title}</h4>
 
-        <div className="flex items-center gap-3 flex-wrap">
+        <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
           {vote.result && (
-            <div className="flex items-center gap-2">
-              <p className="text-sm text-outline">Wynik ogólny:</p>
+            <div className="flex items-center gap-1.5 sm:gap-2">
+              <p className="text-xs sm:text-sm text-outline">Wynik ogólny:</p>
               <Badge
                 variant={vote.result === 'ADOPTED' ? 'voteFor' : 'voteAgainst'}
-                className="px-3 py-1 text-sm"
+                className="px-2 py-0.5 sm:px-3 sm:py-1 text-xs sm:text-sm"
               >
                 {vote.result === 'ADOPTED' ? 'Przyjęto' : 'Odrzucono'}
               </Badge>
             </div>
           )}
           {vote.polandScore != null && vote.polandScore >= 70 && (
-            <Badge className="bg-red-100 text-red-800 border-red-200">
+            <Badge className="bg-red-100 text-red-800 border-red-200 text-xs">
               🔴 Kluczowe
             </Badge>
           )}
           {vote.polandScore != null &&
             vote.polandScore >= 40 &&
             vote.polandScore < 70 && (
-              <Badge className="bg-yellow-100 text-yellow-800 border-yellow-200">
+              <Badge className="bg-yellow-100 text-yellow-800 border-yellow-200 text-xs">
                 🟡 Istotne
               </Badge>
             )}
         </div>
       </div>
 
-      <ChevronRight className="h-5 w-5 shrink-0 text-outline" />
+      <ChevronRight className="h-4 w-4 sm:h-5 sm:w-5 shrink-0 text-outline" />
     </div>
   )
 
