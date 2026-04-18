@@ -54,13 +54,28 @@ export async function generateMetadata({
 
   if (!voteDetails) {
     return {
-      title: 'Głosowanie nie znalezione | Europosłowie.info',
+      title: 'Głosowanie nie znalezione',
     }
   }
 
   return {
-    title: `${voteDetails.title} - Głosowanie | Europosłowie.info`,
+    title: `${voteDetails.title} — Głosowanie`,
     description: `Szczegóły głosowania w Parlamencie Europejskim. Zobacz jak głosowali polscy posłowie: ${voteDetails.summary.for} ZA, ${voteDetails.summary.against} PRZECIW, ${voteDetails.summary.abstain} WSTRZYMAŁO SIĘ.`,
+    alternates: { canonical: `https://europoslowie.pl/glosowania/${voteNumber}` },
+    openGraph: {
+      title: voteDetails.title,
+      description: `${voteDetails.summary.for} ZA · ${voteDetails.summary.against} PRZECIW · ${voteDetails.summary.abstain} WSTRZ.`,
+      url: `https://europoslowie.pl/glosowania/${voteNumber}`,
+      type: 'article',
+      publishedTime: voteDetails.date ? new Date(voteDetails.date).toISOString() : undefined,
+      locale: 'pl_PL',
+      siteName: 'Europosłowie.info',
+    },
+    twitter: {
+      card: 'summary',
+      title: voteDetails.title,
+      description: `${voteDetails.summary.for} ZA · ${voteDetails.summary.against} PRZECIW`,
+    },
   }
 }
 

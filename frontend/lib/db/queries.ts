@@ -167,7 +167,6 @@ export async function getAllMEPsWithStats(): Promise<MEPWithStats[]> {
             speechesCount: s.speeches_count,
             reportsCount: s.reports_count,
             rankingAmongPoles: s.ranking_among_poles,
-            rankingInGroup: s.ranking_in_group,
             votes5Star: s.votes_poland_5star,
             votes4Star: s.votes_poland_4star,
           }
@@ -1150,4 +1149,20 @@ export async function getNextSession(): Promise<UpcomingSessionData> {
     month: Number(rows[0].mo),
     sessions,
   }
+}
+
+export async function getAllMepSlugs() {
+  return db
+    .select({ slug: meps.slug, updatedAt: meps.updatedAt })
+    .from(meps)
+    .where(eq(meps.isActive, true))
+    .orderBy(asc(meps.slug))
+}
+
+export async function getAllRepresentativeVoteNumbers() {
+  return db
+    .select({ voteNumber: voteItems.voteNumber, date: voteItems.date })
+    .from(voteItems)
+    .where(eq(voteItems.isRepresentative, true))
+    .orderBy(desc(voteItems.date))
 }

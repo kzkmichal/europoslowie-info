@@ -7,9 +7,10 @@ import { LastSessionCard } from '@/components/sessions/LastSessionCard'
 import { UpcomingSessionCard } from '@/components/sessions/UpcomingSessionCard'
 
 export const generateMetadata = () => ({
-  title: 'Europosłowie.info — Monitoring aktywności polskich europosłów',
+  title: { absolute: 'Europosłowie.info — Monitoring aktywności polskich europosłów' },
   description:
     'Przejrzysta platforma monitorująca aktywność, głosowania i obecność polskich posłów w Parlamencie Europejskim.',
+  openGraph: { url: 'https://europoslowie.pl' },
 })
 
 export default async function HomePage() {

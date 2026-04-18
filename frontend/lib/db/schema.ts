@@ -45,7 +45,6 @@ export const monthlyStats = pgTable('monthly_stats', {
   votesAbsent: integer('votes_absent').notNull().default(0),
   attendanceRate: real('attendance_rate').notNull().default(0),
   rankingAmongPoles: integer('ranking_among_poles'),
-  rankingInGroup: integer('ranking_in_group'),
   questionsCount: integer('questions_count').default(0),
   speechesCount: integer('speeches_count').default(0),
   reportsCount: integer('reports_count').default(0),
@@ -90,22 +89,6 @@ export const voteItems = pgTable('vote_items', {
     model?: string
     generated_at?: string
   }>(),
-  argumentsFor: jsonb('arguments_for').$type<
-    Array<{
-      quote: string
-      speaker: string
-      group: string
-      country: string
-    }>
-  >(),
-  argumentsAgainst: jsonb('arguments_against').$type<
-    Array<{
-      quote: string
-      speaker: string
-      group: string
-      country: string
-    }>
-  >(),
   polishVotesFor: integer('polish_votes_for'),
   polishVotesAgainst: integer('polish_votes_against'),
   polishVotesAbstain: integer('polish_votes_abstain'),

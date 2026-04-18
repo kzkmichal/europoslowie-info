@@ -4,7 +4,7 @@ import { VoteCard } from '@/components/votes/VoteCard'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = {
-  title: 'Top głosowania | Europosłowie.info',
+  title: 'Top głosowania',
   description:
     'Najważniejsze głosowania w Parlamencie Europejskim w bieżącym miesiącu. Zobacz głosowania o największym znaczeniu dla Polski.',
   keywords: [
@@ -14,6 +14,7 @@ export const metadata: Metadata = {
     'Polska',
     'głosowania europosłów',
   ],
+  openGraph: { url: 'https://europoslowie.pl/top-glosowania' },
 }
 
 export default async function TopVotesPage() {

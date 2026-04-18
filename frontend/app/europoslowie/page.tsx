@@ -4,9 +4,10 @@ import { Container } from '@/components/layout/Container'
 import { MEPGrid } from '@/components/meps/MEPGrid'
 
 export const generateMetadata = () => ({
-  title: 'Polscy Europosłowie - Lista posłów w PE | Europosłowie.info',
+  title: 'Polscy Europosłowie — Lista posłów w PE',
   description:
     'Pełna lista 53 polskich europosłów w Parlamencie Europejskim. Sprawdź statystyki obecności, głosowania i aktywność każdego posła.',
+  openGraph: { url: 'https://europoslowie.pl/europoslowie' },
 })
 
 export default async function EuroposlowiePage() {
