@@ -19,9 +19,11 @@ export type PageProps = {
 }
 
 export const metadata: Metadata = {
-  title: 'Głosowania posłów w Parlamencie Europejskim | Europosłowie.info',
+  title: 'Głosowania posłów w Parlamencie Europejskim',
   description:
     'Sprawdź, jak głosowali polscy posłowie w Parlamencie Europejskim. Znajdziesz tu szczegółowe informacje o ich decyzjach podczas głosowań, a także statystyki dotyczące ich aktywności i obecności.',
+  alternates: { canonical: 'https://europoslowie.pl/glosowania' },
+  openGraph: { url: 'https://europoslowie.pl/glosowania' },
 }
 
 export default async function GlosowaniaPage({ searchParams }: PageProps) {

@@ -5,7 +5,11 @@ import { Footer } from '@/components/layout/Footer'
 import { inter, publicSans } from './fonts'
 
 export const metadata: Metadata = {
-  title: 'Europosłowie.info - Monitoruj polskich posłów w PE',
+  metadataBase: new URL('https://europoslowie.pl'),
+  title: {
+    default: 'Europosłowie.pl — Monitoruj polskich posłów w PE',
+    template: '%s | Europosłowie.pl',
+  },
   description:
     'Platforma transparentności politycznej monitorująca aktywność 53 polskich europosłów w Parlamencie Europejskim. Statystyki, głosowania, obecność.',
   keywords: [
@@ -16,14 +20,20 @@ export const metadata: Metadata = {
     'głosowania',
     'statystyki',
   ],
-  authors: [{ name: 'Europosłowie.info' }],
+  authors: [{ name: 'Europosłowie.pl' }],
+  robots: { index: true, follow: true, googleBot: { index: true, follow: true } },
   openGraph: {
-    title: 'Europosłowie.info',
+    title: 'Europosłowie.pl',
     description: 'Monitoruj aktywność polskich europosłów w PE',
-    url: 'https://europoslowie.info',
-    siteName: 'Europosłowie.info',
+    url: 'https://europoslowie.pl',
+    siteName: 'Europosłowie.pl',
     locale: 'pl_PL',
     type: 'website',
+  },
+  twitter: {
+    card: 'summary',
+    title: 'Europosłowie.pl',
+    description: 'Monitoruj aktywność polskich europosłów w PE',
   },
 }
 

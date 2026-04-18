@@ -2,7 +2,7 @@ import { Container } from '@/components/layout/Container'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = {
-  title: 'O projekcie | Europosłowie.info',
+  title: 'O projekcie',
   description:
     'Europosłowie.info to platforma monitorująca aktywność 53 polskich europosłów w Parlamencie Europejskim. Transparentność, obiektywność i dane publiczne.',
   keywords: [
@@ -12,6 +12,7 @@ export const metadata: Metadata = {
     'transparentność polityczna',
     'parlament europejski',
   ],
+  openGraph: { url: 'https://europoslowie.pl/o-projekcie' },
 }
 
 export default function OProjekciePage() {
@@ -178,10 +179,10 @@ export default function OProjekciePage() {
                 <p className="text-sm">
                   <strong>Email:</strong>{' '}
                   <a
-                    href="mailto:kontakt@europoslowie.info"
+                    href="mailto:kontakt@europoslowie.pl"
                     className="text-blue-600 underline"
                   >
-                    kontakt@europoslowie.info
+                    kontakt@europoslowie.pl
                   </a>
                 </p>
                 <p className="mt-2 text-sm">

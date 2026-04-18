@@ -2,7 +2,7 @@ import { Container } from '@/components/layout/Container'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = {
-  title: 'Metodologia | Europosłowie.info',
+  title: 'Metodologia',
   description:
     'Poznaj metodologię rankingu polskich europosłów. Dowiedz się jak obliczamy statystyki obecności, oceniamy głosowania i wyznaczamy ranking aktywności.',
   keywords: [
@@ -12,6 +12,7 @@ export const metadata: Metadata = {
     'statystyki PE',
     'ocena posłów',
   ],
+  openGraph: { url: 'https://europoslowie.pl/metodologia' },
 }
 
 export default function MetodologiaPage() {

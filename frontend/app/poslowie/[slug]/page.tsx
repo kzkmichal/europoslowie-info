@@ -30,17 +30,35 @@ export async function generateMetadata({
 
   if (!mep) {
     return {
-      title: 'Poseł nie znaleziony | Europosłowie.info',
+      title: 'Poseł nie znaleziony',
     }
   }
 
   return {
-    title: `${mep.fullName} - Profil posła | Europosłowie.info`,
+    title: `${mep.fullName} — Profil posła`,
     description: `Profil ${mep.fullName} (${
       mep.nationalParty || 'niezależny'
     }, ${
       mep.epGroup || 'brak grupy'
     }). Statystyki obecności, głosowania i aktywność w Parlamencie Europejskim.`,
+    alternates: { canonical: `https://europoslowie.pl/poslowie/${slug}` },
+    openGraph: {
+      title: mep.fullName,
+      description: `${mep.nationalParty ?? 'niezależny'} · ${mep.epGroup ?? ''} · Statystyki głosowań i aktywności`,
+      url: `https://europoslowie.pl/poslowie/${slug}`,
+      type: 'profile',
+      firstName: mep.firstName ?? undefined,
+      lastName: mep.lastName ?? undefined,
+      images: mep.photoUrl ? [{ url: mep.photoUrl, width: 96, height: 96, alt: mep.fullName }] : undefined,
+      locale: 'pl_PL',
+      siteName: 'Europosłowie.info',
+    },
+    twitter: {
+      card: mep.photoUrl ? 'summary_large_image' : 'summary',
+      title: mep.fullName,
+      description: `${mep.nationalParty ?? ''} · ${mep.epGroup ?? ''}`,
+      images: mep.photoUrl ? [mep.photoUrl] : undefined,
+    },
   }
 }
 
