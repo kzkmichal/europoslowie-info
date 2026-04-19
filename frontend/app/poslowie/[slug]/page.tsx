@@ -6,6 +6,7 @@ import {
   getMepSpeechesBySession,
   getMepQuestionsBySession,
   getMepDocuments,
+  getAllMepSlugs,
 } from '@/lib/db/queries'
 import { notFound } from 'next/navigation'
 import { Container } from '@/components/layout/Container'
@@ -16,6 +17,11 @@ import { ProfileTab } from '@/components/meps/profile/ProfileTab'
 import { VotesTab } from '@/components/meps/profile/VotesTab'
 import { ActivityTab } from '@/components/meps/profile/ActivityTab'
 import { DocumentsTab } from '@/components/meps/profile/DocumentsTab'
+
+export async function generateStaticParams() {
+  const slugs = await getAllMepSlugs()
+  return slugs.map(({ slug }) => ({ slug }))
+}
 
 export type PageParams = {
   params: Promise<{ slug: string }>

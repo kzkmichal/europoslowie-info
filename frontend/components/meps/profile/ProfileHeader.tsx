@@ -27,6 +27,8 @@ export const ProfileHeader = ({ mep, docsCount }: ProfileHeaderProps) => {
               alt={mep.fullName}
               width={128}
               height={171}
+              priority
+              sizes="(max-width: 1024px) 96px, 128px"
               className="h-full w-full object-cover"
             />
           ) : (
