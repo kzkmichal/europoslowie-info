@@ -46,7 +46,7 @@ export const VoteRow = ({ vote }: VoteRowProps) => {
   const { tileBg, iconBg, labelColor, label, Icon } = choice
 
   const content = (
-    <div className="flex items-center gap-3 sm:gap-6 rounded-xl border border-transparent bg-surface-container-lowest p-3 sm:p-4 transition-all duration-300 hover:border-outline-variant/30">
+    <div className="flex items-center gap-3 sm:gap-6 rounded-xl border border-transparent bg-surface-container-lowest p-3 sm:p-4 transition-colors hover:border-outline-variant/30">
       <div
         className={cn(
           'flex min-w-[56px] sm:min-w-[80px] flex-col items-center justify-center rounded-lg p-2 sm:p-3 gap-1.5 sm:gap-2',
@@ -75,7 +75,7 @@ export const VoteRow = ({ vote }: VoteRowProps) => {
           </div>
         )}
 
-        <h4 className="text-primary text-sm sm:text-lg">{vote.title}</h4>
+        <h3 className="text-primary text-sm sm:text-lg">{vote.title}</h3>
 
         <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
           {vote.result && (

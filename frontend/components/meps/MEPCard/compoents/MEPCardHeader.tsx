@@ -4,14 +4,14 @@ import type { MEPWithStats } from '@/lib/types'
 export const MEPCardHeader = ({ mep }: { mep: MEPWithStats }) => {
   return (
     <div className="flex items-start gap-3 mb-4">
-      <div className="relative w-[60px] h-20 shrink-0 overflow-hidden rounded-lg ring-1 ring-outline-variant/40">
+      <div className="relative w-15 aspect-3/4 shrink-0 overflow-hidden rounded-lg ring-1 ring-outline-variant/40">
         {mep.photoUrl ? (
           <Image
             src={mep.photoUrl}
             alt={mep.fullName}
-            width={60}
-            height={80}
-            className="h-full w-full object-cover object-top"
+            fill
+            sizes="60px"
+            className="object-cover object-top"
           />
         ) : (
           <div className="flex h-full items-center justify-center text-2xl font-bold text-on-surface-variant bg-surface-container-high">

@@ -64,9 +64,9 @@ export const VotesTab = ({
                 className="bg-surface-container-low rounded-xl p-6"
               >
                 <div className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-outline-variant/15 pb-4">
-                  <h3 className="text-base font-bold text-primary">
+                  <h2 className="text-base font-bold text-primary">
                     {dayLabel}
-                  </h3>
+                  </h2>
                   <div className="flex flex-wrap gap-1.5">
                     {forCount > 0 && (
                       <Badge variant="voteFor" className="px-3 py-1 text-sm">
