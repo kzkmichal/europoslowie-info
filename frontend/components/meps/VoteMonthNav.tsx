@@ -59,7 +59,7 @@ const VoteMonthNav = ({
           value={currentKey}
           onValueChange={(value) => router.push(buildUrl(value))}
         >
-          <SelectTrigger className="w-auto min-w-52">
+          <SelectTrigger className="w-auto min-w-52" aria-label="Wybierz miesiąc">
             <SelectValue placeholder="Wybierz miesiąc" />
           </SelectTrigger>
           <SelectContent>
