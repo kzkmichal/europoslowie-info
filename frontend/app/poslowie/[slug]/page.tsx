@@ -9,6 +9,7 @@ import {
   getAllMepSlugs,
 } from '@/lib/db/queries'
 import { notFound } from 'next/navigation'
+import { Suspense } from 'react'
 import { Container } from '@/components/layout/Container'
 import type { Metadata } from 'next'
 import { ProfileHeader } from '@/components/meps/profile/ProfileHeader'
@@ -55,7 +56,9 @@ export async function generateMetadata({
       type: 'profile',
       firstName: mep.firstName ?? undefined,
       lastName: mep.lastName ?? undefined,
-      images: mep.photoUrl ? [{ url: mep.photoUrl, width: 96, height: 96, alt: mep.fullName }] : undefined,
+      images: mep.photoUrl
+        ? [{ url: mep.photoUrl, width: 96, height: 96, alt: mep.fullName }]
+        : undefined,
       locale: 'pl_PL',
       siteName: 'Europosłowie.info',
     },
@@ -66,6 +69,71 @@ export async function generateMetadata({
       images: mep.photoUrl ? [mep.photoUrl] : undefined,
     },
   }
+}
+
+type TabContentProps = {
+  slug: string
+  activeTab: string
+  monthParam: string | undefined
+  mep: NonNullable<Awaited<ReturnType<typeof getMepBySlug>>>
+  mepDocs: Awaited<ReturnType<typeof getMepDocuments>>
+}
+
+const TabContent = async ({
+  slug,
+  activeTab,
+  monthParam,
+  mep,
+  mepDocs,
+}: TabContentProps) => {
+  if (activeTab === 'profile') return <ProfileTab mep={mep} docs={mepDocs} />
+  if (activeTab === 'documents') return <DocumentsTab documents={mepDocs} />
+
+  const [monthList, activityMonthList] = await Promise.all([
+    getMepMonthList(slug),
+    getMepActivityMonthList(slug),
+  ])
+
+  let currentYear: number
+  let currentMonth: number
+  if (monthParam && /^\d{4}-\d{2}$/.test(monthParam)) {
+    const [y, m] = monthParam.split('-').map(Number)
+    currentYear = y
+    currentMonth = m
+  } else {
+    currentYear = monthList[0]?.year ?? new Date().getFullYear()
+    currentMonth = monthList[0]?.month ?? new Date().getMonth() + 1
+  }
+
+  if (activeTab === 'votes') {
+    const votes = await getMepVotesByMonth(slug, currentYear, currentMonth)
+    return (
+      <VotesTab
+        monthList={monthList}
+        votes={votes}
+        currentYear={currentYear}
+        currentMonth={currentMonth}
+        slug={slug}
+      />
+    )
+  }
+
+  const monthStart = new Date(currentYear, currentMonth - 1, 1)
+  const monthEnd = new Date(currentYear, currentMonth, 0)
+  const [sessionSpeeches, sessionQuestions] = await Promise.all([
+    getMepSpeechesBySession(slug, monthStart, monthEnd),
+    getMepQuestionsBySession(slug, monthStart, monthEnd),
+  ])
+  return (
+    <ActivityTab
+      monthList={activityMonthList}
+      speeches={sessionSpeeches}
+      questions={sessionQuestions}
+      currentYear={currentYear}
+      currentMonth={currentMonth}
+      slug={slug}
+    />
+  )
 }
 
 export default async function MEPProfilePage({
@@ -82,10 +150,8 @@ export default async function MEPProfilePage({
       ? tab
       : 'profile'
 
-  const [mep, monthList, activityMonthList, mepDocs] = await Promise.all([
+  const [mep, mepDocs] = await Promise.all([
     getMepBySlug(slug),
-    getMepMonthList(slug),
-    getMepActivityMonthList(slug),
     getMepDocuments(slug),
   ])
 
@@ -93,61 +159,26 @@ export default async function MEPProfilePage({
     notFound()
   }
 
-  let currentYear: number
-  let currentMonth: number
-  if (monthParam && /^\d{4}-\d{2}$/.test(monthParam)) {
-    const [y, m] = monthParam.split('-').map(Number)
-    currentYear = y
-    currentMonth = m
-  } else {
-    currentYear = monthList[0]?.year ?? new Date().getFullYear()
-    currentMonth = monthList[0]?.month ?? new Date().getMonth() + 1
-  }
-
-  const monthStart = new Date(currentYear, currentMonth - 1, 1)
-  const monthEnd = new Date(currentYear, currentMonth, 0)
-
-  const tabContentLayout: Record<string, () => Promise<React.ReactNode>> = {
-    profile: async () => <ProfileTab mep={mep} docs={mepDocs} />,
-    votes: async () => {
-      const votes = await getMepVotesByMonth(slug, currentYear, currentMonth)
-      return (
-        <VotesTab
-          monthList={monthList}
-          votes={votes}
-          currentYear={currentYear}
-          currentMonth={currentMonth}
-          slug={slug}
-        />
-      )
-    },
-    activity: async () => {
-      const [sessionSpeeches, sessionQuestions] = await Promise.all([
-        getMepSpeechesBySession(slug, monthStart, monthEnd),
-        getMepQuestionsBySession(slug, monthStart, monthEnd),
-      ])
-      return (
-        <ActivityTab
-          monthList={activityMonthList}
-          speeches={sessionSpeeches}
-          questions={sessionQuestions}
-          currentYear={currentYear}
-          currentMonth={currentMonth}
-          slug={slug}
-        />
-      )
-    },
-    documents: async () => <DocumentsTab documents={mepDocs} />,
-  }
-
-  const tabContent = await (tabContentLayout[activeTab] ?? tabContentLayout.profile)()
-
   return (
     <div className="py-8">
       <Container>
         <ProfileHeader mep={mep} docsCount={mepDocs.length} />
         <ProfileTabs slug={slug} activeTab={activeTab} month={monthParam} />
-        {tabContent}
+        <Suspense
+          fallback={
+            <div className="py-8 text-center text-on-surface-variant">
+              Ładowanie...
+            </div>
+          }
+        >
+          <TabContent
+            slug={slug}
+            activeTab={activeTab}
+            monthParam={monthParam}
+            mep={mep}
+            mepDocs={mepDocs}
+          />
+        </Suspense>
       </Container>
     </div>
   )

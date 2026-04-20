@@ -49,7 +49,6 @@ type LatestStatsRow = {
   speeches_count: number | null
   reports_count: number | null
   ranking_among_poles: number | null
-  ranking_in_group: number | null
   votes_poland_5star: number | null
   votes_poland_4star: number | null
 }
@@ -116,7 +115,6 @@ export async function getAllMEPsWithStats(): Promise<MEPWithStats[]> {
         ms.speeches_count,
         ms.reports_count,
         ms.ranking_among_poles,
-        ms.ranking_in_group,
         ms.votes_poland_5star,
         ms.votes_poland_4star
       FROM dynamic_stats d
