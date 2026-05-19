@@ -31,8 +31,10 @@ export type PageParams = {
 
 export async function generateMetadata({
   params,
+  searchParams,
 }: PageParams): Promise<Metadata> {
   const { slug } = await params
+  const { tab } = await searchParams
   const mep = await getMepBySlug(slug)
 
   if (!mep) {
@@ -41,13 +43,19 @@ export async function generateMetadata({
     }
   }
 
+  const tabDescriptions: Record<string, string> = {
+    votes: `Historia głosowań ${mep.fullName} w Parlamencie Europejskim — jak głosował w sprawach ważnych dla Polski.`,
+    activity: `Aktywność parlamentarna ${mep.fullName} — przemówienia, pytania i dokumenty w PE.`,
+    documents: `Dokumenty i sprawozdania ${mep.fullName} w Parlamencie Europejskim.`,
+  }
+  const activeTab = typeof tab === 'string' ? tab : 'profile'
+  const description =
+    tabDescriptions[activeTab] ??
+    `Profil ${mep.fullName} (${mep.nationalParty || 'niezależny'}, ${mep.epGroup || 'brak grupy'}). Statystyki obecności, głosowania i aktywność w Parlamencie Europejskim.`
+
   return {
     title: `${mep.fullName} — Profil posła`,
-    description: `Profil ${mep.fullName} (${
-      mep.nationalParty || 'niezależny'
-    }, ${
-      mep.epGroup || 'brak grupy'
-    }). Statystyki obecności, głosowania i aktywność w Parlamencie Europejskim.`,
+    description,
     alternates: { canonical: `https://europoslowie.pl/poslowie/${slug}` },
     openGraph: {
       title: mep.fullName,
@@ -166,7 +174,7 @@ export default async function MEPProfilePage({
         <ProfileTabs slug={slug} activeTab={activeTab} month={monthParam} />
         <Suspense
           fallback={
-            <div className="py-8 text-center text-on-surface-variant">
+            <div className="min-h-[600px] py-8 text-center text-on-surface-variant">
               Ładowanie...
             </div>
           }
