@@ -1,8 +1,9 @@
-# Quick Start Guide - Europosłowie.info
+# Quick Start Guide - Europosłowie.pl
 
 ## Prerequisites
 
 ✅ Already installed on your system:
+
 - Node.js v23.6.0
 - npm 10.9.2
 - Docker (database is running)
@@ -11,12 +12,14 @@
 ## Current Status
 
 **Database:** ✅ Running on port 5433
+
 ```bash
 docker ps
 # Should show: europosel-db container running
 ```
 
 **Frontend Dependencies:** ✅ Installed
+
 ```bash
 ls frontend/node_modules | wc -l
 # Should show ~300+ packages
@@ -31,6 +34,7 @@ docker-compose up -d
 ```
 
 Check status:
+
 ```bash
 docker ps
 # Should show: europosel-db on 0.0.0.0:5433->5432/tcp
@@ -39,6 +43,7 @@ docker ps
 ### 2. Configure Environment Variables
 
 **Frontend (.env.local):**
+
 ```bash
 cd frontend
 cat .env.local
@@ -46,11 +51,13 @@ cat .env.local
 ```
 
 If missing, create it:
+
 ```bash
 echo 'DATABASE_URL=postgresql://postgres:dev@localhost:5433/europoslowie' > .env.local
 ```
 
 **Backend (.env):**
+
 ```bash
 cd ..
 cat .env
@@ -58,6 +65,7 @@ cat .env
 ```
 
 If missing, create it:
+
 ```bash
 echo 'DATABASE_URL=postgresql://postgres:dev@localhost:5433/europoslowie?client_encoding=utf8' > .env
 ```
@@ -73,11 +81,13 @@ npm run db:test
 ### 4. Start Development Server
 
 **Option 1: From root directory (recommended):**
+
 ```bash
 npm run dev
 ```
 
 **Option 2: From frontend directory:**
+
 ```bash
 cd frontend
 npm run dev
@@ -94,6 +104,7 @@ Server should start on: **http://localhost:3000**
 **Error:** `Port 3000 is already in use`
 
 **Solution:**
+
 ```bash
 # Find process using port 3000
 lsof -ti:3000
@@ -108,6 +119,7 @@ PORT=3001 npm run dev
 **Error:** `ECONNREFUSED` or `password authentication failed`
 
 **Check database:**
+
 ```bash
 docker ps
 # If not running:
@@ -115,12 +127,14 @@ docker-compose up -d
 ```
 
 **Test connection:**
+
 ```bash
 cd frontend
 npm run db:test
 ```
 
 **Verify credentials:**
+
 - Host: localhost
 - Port: 5433 (not 5432!)
 - User: postgres
@@ -132,6 +146,7 @@ npm run db:test
 **Error:** `Cannot find module 'next'` or similar
 
 **Solution:**
+
 ```bash
 cd frontend
 rm -rf node_modules package-lock.json
@@ -143,6 +158,7 @@ npm install
 **Error:** Type errors during build
 
 **Solution:**
+
 ```bash
 cd frontend
 npm run lint
@@ -154,6 +170,7 @@ npm run lint
 **Error:** When running scrapers
 
 **Solution:**
+
 ```bash
 # Check Python version
 python3 --version
@@ -176,6 +193,7 @@ npm run db:test:queries
 ```
 
 Expected output:
+
 ```
 ✅ Database connection initialized
 ✅ Found 58 MEPs
@@ -191,6 +209,7 @@ npm run dev
 Visit: http://localhost:3000
 
 You should see:
+
 - Homepage with MEP cards
 - Database stats
 - No console errors
@@ -198,6 +217,7 @@ You should see:
 ### 3. Check API Routes
 
 Once dev server is running, test:
+
 - http://localhost:3000/api/health
 - Should return JSON with status
 
@@ -278,7 +298,7 @@ Run this to verify everything works:
 ```bash
 #!/bin/bash
 
-echo "🧪 Testing Europosłowie.info setup..."
+echo "🧪 Testing Europosłowie.pl setup..."
 
 # Check database
 echo "1. Checking database..."

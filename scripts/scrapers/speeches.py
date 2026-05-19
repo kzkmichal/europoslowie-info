@@ -24,6 +24,7 @@ class SpeechesScraper(BaseScraper):
         self,
         mep_ep_ids: List[int],
         year: Optional[int] = None,
+        month: Optional[int] = None,
         known_ids: Set[str] = None,
     ) -> List[Dict[str, Any]]:
         """
@@ -34,21 +35,22 @@ class SpeechesScraper(BaseScraper):
             year: If provided, only keep speeches from that calendar year.
                   The API has no server-side date filter, so filtering is done
                   client-side.
+            month: If provided alongside year, only keep speeches from that month.
             known_ids: ep_activity_ids already in the DB — skipped in results.
 
         Returns:
             List of speech dicts ready for upsert.
         """
         known = known_ids or set()
+        period = (f"year={year}" + (f"-{month:02d}" if month else "")) if year else "all years"
         self.log_info(
-            f"Starting speeches scrape for {len(mep_ep_ids)} MEPs"
-            + (f" (year={year})" if year else " (all years)")
+            f"Starting speeches scrape for {len(mep_ep_ids)} MEPs ({period})"
             + (f", skipping {len(known)} known IDs" if known else "")
         )
         all_speeches = []
 
         for ep_id in mep_ep_ids:
-            speeches = self._scrape_for_mep(ep_id, year=year, known=known)
+            speeches = self._scrape_for_mep(ep_id, year=year, month=month, known=known)
             all_speeches.extend(speeches)
             self.stats['items_scraped'] += len(speeches)
             self.log_info(f"  MEP {ep_id}: {len(speeches)} new speeches")
@@ -56,7 +58,7 @@ class SpeechesScraper(BaseScraper):
         return all_speeches
 
     def _scrape_for_mep(
-        self, ep_id: int, year: Optional[int] = None, known: set = None
+        self, ep_id: int, year: Optional[int] = None, month: Optional[int] = None, known: set = None
     ) -> List[Dict[str, Any]]:
         """Paginate through speeches for a single MEP."""
         known = known or set()
@@ -90,8 +92,12 @@ class SpeechesScraper(BaseScraper):
                 speech = self._parse_speech(item, ep_id)
                 if not speech:
                     continue
-                # Client-side year filter (API has no date param for speeches)
-                if year and not str(speech['speech_date']).startswith(str(year)):
+                # Client-side date filter (API has no server-side date params)
+                date_str = str(speech['speech_date'])
+                if year and month:
+                    if not date_str.startswith(f"{year}-{month:02d}"):
+                        continue
+                elif year and not date_str.startswith(str(year)):
                     continue
                 if speech['ep_activity_id'] in known:
                     continue

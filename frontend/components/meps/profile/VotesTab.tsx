@@ -61,7 +61,7 @@ export const VotesTab = ({
             return (
               <div
                 key={dateKey}
-                className="bg-surface-container-low rounded-xl p-6"
+                className="bg-surface-container-low rounded-xl p-4  md:p-6"
               >
                 <div className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-outline-variant/15 pb-4">
                   <h2 className="text-base font-bold text-primary">

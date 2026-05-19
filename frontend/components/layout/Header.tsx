@@ -30,7 +30,7 @@ export const Header = () => {
             href="/"
             className="font-display text-xl font-bold tracking-tighter text-primary"
           >
-            Europosłowie.info
+            Europosłowie
           </Link>
 
           <nav className="hidden md:flex items-center gap-8">
