@@ -14,9 +14,9 @@ on:
 
 jobs:
   collect:
-    name: Collect — scrapers + representative votes
+    name: Collect — sessions, votes, representative votes
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 45
     outputs:
       year: ${{ steps.date.outputs.year }}
       month: ${{ steps.date.outputs.month }}
@@ -46,16 +46,18 @@ jobs:
           echo "from_date=$FROM_DATE" >> $GITHUB_OUTPUT
           echo "Resolved: year=$YEAR month=$MONTH from_date=$FROM_DATE"
 
-      - name: Run scrapers (sessions, votes, questions, speeches)
+      - name: Run scrapers (sessions + votes only)
         run: |
           python scripts/run_scrapers.py \
             --year ${{ steps.date.outputs.year }} \
             --month ${{ steps.date.outputs.month }} \
             --skip-meps \
-            --skip-committees
+            --skip-committees \
+            --skip-questions \
+            --skip-speeches \
+            --skip-documents
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
 
       - name: Populate representative votes
         run: python scripts/populate_representative_votes.py
@@ -63,7 +65,7 @@ jobs:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
   enrich:
-    name: Enrich — sources, AI descriptions, categories, relevance
+    name: Enrich — questions, speeches, sources, AI
     runs-on: ubuntu-latest
     needs: collect
     timeout-minutes: 300
@@ -78,6 +80,19 @@ jobs:
 
       - name: Install dependencies
         run: pip install -r requirements.txt
+
+      - name: Scrape questions, speeches, plenary documents
+        run: |
+          python scripts/run_scrapers.py \
+            --year ${{ needs.collect.outputs.year }} \
+            --month ${{ needs.collect.outputs.month }} \
+            --skip-meps \
+            --skip-committees \
+            --skip-sessions \
+            --skip-votes
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
 
       - name: Populate vote sources — Tier 1 (RCV_XML, VOT_XML, REPORT)
         run: python scripts/populate_vote_sources.py --from-date ${{ needs.collect.outputs.from_date }}
