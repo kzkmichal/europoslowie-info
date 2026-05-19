@@ -1,282 +1,197 @@
-# Europosłowie.info
+# Europosłowie.pl
 
-Platform transparentności politycznej monitorująca aktywność polskich europosłów w Parlamencie Europejskim.
+**Platforma transparentności politycznej** — śledzimy aktywność 53 polskich europosłów w Parlamencie Europejskim.
 
-## Quick Start
+[![Live](https://img.shields.io/badge/live-europoslowie.pl-blue)](https://europoslowie.pl)
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
+
+## O projekcie
+
+Strona umożliwia każdemu obywatelowi sprawdzenie:
+
+- **jak głosował każdy polski europoseł** — wyniki głosowań, frekwencja, historia po sesjach
+- **co dane głosowanie oznacza dla Polski** — scoring AI: 🔴 kluczowe / 🟡 istotne / ⚪ neutralne
+- **co jest głosowane** — kontekst AI z opisem i kluczowymi punktami, linki do źródeł EP
+- **pytania parlamentarne i przemówienia** złożone przez każdego europosła
+- **filtrowanie głosowań** po temacie, wyniku, miesiącu i tekście
+
+Dane są pobierane z [EP Open Data API v2](https://data.europarl.europa.eu/api/v2/) i aktualizowane automatycznie co miesiąc przez GitHub Actions.
+
+---
+
+## Tech stack
+
+| Layer    | Technology                                                      |
+| -------- | --------------------------------------------------------------- |
+| Frontend | Next.js 15, TypeScript, Tailwind CSS, Drizzle ORM               |
+| Database | PostgreSQL 15 (Docker locally, Supabase in prod)                |
+| Scrapers | Python 3.11, EP Open Data API v2                                |
+| AI       | Claude Haiku 4.5 — vote descriptions + Poland relevance scoring |
+| Hosting  | Vercel (frontend) + GitHub Actions (monthly scraping)           |
+
+## Data flow
+
+```
+EP Open Data API v2
+        ↓
+  Python scrapers  (scripts/)
+        ↓
+  PostgreSQL · 9 tables
+        ↓
+  Drizzle ORM  (frontend/lib/db/)
+        ↓
+  Next.js ISR  →  Vercel
+```
+
+---
+
+## Local development
 
 ### Prerequisites
 
 - Node.js 20+
 - Python 3.11+
-- Docker (for PostgreSQL)
-- Git
+- Docker
 
-### 1. Clone and Install
+### 1. Clone and install
 
 ```bash
-git clone <repository-url>
+git clone https://github.com/kzkmichal/europrojekt.git
 cd europrojekt
 
-# Install Python dependencies
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+# Python dependencies
+python -m venv venv && source venv/bin/activate
 pip install -r requirements.txt
 
-# Install Node dependencies
-cd frontend
-npm install
-cd ..
+# Node dependencies
+cd frontend && npm install && cd ..
 ```
 
-### 2. Set up Database
+### 2. Start database
 
 ```bash
-# Start PostgreSQL with Docker
-docker-compose up -d db
-
-# Or use Docker CLI
-docker run -d --name europosel-db \
-  -e POSTGRES_PASSWORD=dev \
-  -e POSTGRES_DB=europoslowie \
-  -p 5432:5432 \
-  postgres:15
-
-# Verify database is running
-docker ps | grep europosel-db
+docker-compose up -d        # PostgreSQL on port 5433
 ```
 
-### 3. Configure Environment
+### 3. Environment variables
 
-```bash
-# Copy example env file
-cp .env.example .env.local
+**`frontend/.env.local`**
 
-# Edit .env.local with your settings
-# DATABASE_URL is already set for local Docker PostgreSQL
+```
+DATABASE_URL=postgresql://postgres:dev@localhost:5433/europoslowie
 ```
 
-### 4. Run Database Migrations
+**`.env`** (backend scrapers)
+
+```
+DATABASE_URL=postgresql://postgres:dev@localhost:5433/europoslowie?client_encoding=utf8
+ANTHROPIC_API_KEY=sk-ant-...
+```
+
+### 4. Run migrations and seed
 
 ```bash
-# Make sure venv is activated
 source venv/bin/activate
-
-# Run migrations
 alembic upgrade head
-```
-
-Expected output:
-
-```
-INFO  [alembic.runtime.migration] Running upgrade -> 001
-✓ Migrations completed successfully
-```
-
-### 5. Seed Test Data
-
-```bash
 python scripts/seed_database.py --minimal
 ```
 
-Expected output:
-
-```
-✓ Created 5 test MEPs
-✓ Created 1 test voting session
-✓ Created 20 test votes
-✓ Created monthly stats
-✅ Database seeded successfully!
-```
-
-### 6. Verify Setup
+### 5. Start dev server
 
 ```bash
-# Connect to database
+cd frontend && npm run dev    # http://localhost:3000
+```
+
+### Useful commands
+
+```bash
+npm run db:test               # Test database connection
+npm run db:test:queries       # Test all query functions
+npm run db:studio             # Drizzle ORM Studio UI
+
 docker exec -it europosel-db psql -U postgres -d europoslowie
-
-# Run test queries
-SELECT COUNT(*) FROM meps;           -- Should return: 5
-SELECT COUNT(*) FROM votes;          -- Should return: 20
-SELECT * FROM meps LIMIT 1;          -- Should show MEP data
-
-# Exit psql
-\q
-
-# Test Drizzle ORM and query functions
-cd frontend
-npm run db:test          # Test database connection
-npm run db:test:queries  # Test all query functions
 ```
 
-Expected output:
-```
-✅ Database connection successful
-✅ All query tests completed successfully!
-```
+---
 
-## Database Schema
+## Scraping — adding a new month
 
-The database consists of 7 main tables:
-
-1. **meps** - Polish MEPs (53 in production, 5 in test)
-2. **voting_sessions** - Plenary sessions (12-15 per year)
-3. **votes** - Individual voting records (largest table)
-4. **monthly_stats** - Pre-calculated statistics per MEP
-5. **questions** - Parliamentary questions
-6. **speeches** - Parliamentary speeches
-7. **committee_memberships** - Committee assignments
-
-See `docs/DATABASE_SCHEMA.md` for detailed documentation.
-
-## Development Workflow
-
-### Daily Workflow
+The full pipeline runs 9 steps in sequence. Example for March 2026:
 
 ```bash
-# 1. Start database (if not running)
-docker start europosel-db
-
-# 2. Activate Python venv
 source venv/bin/activate
 
-# 3. Work on code...
+# 1. Scrape sessions and votes
+python scripts/run_scrapers.py --year 2026 --month 3 --skip-meps --skip-committees
 
-# 4. Run tests
-pytest
+# 2. Mark representative votes per group
+python scripts/populate_representative_votes.py
 
-# 5. Stop database (optional)
-docker stop europosel-db
+# 3–5. Populate vote sources (tiers 1–3)
+python scripts/populate_vote_sources.py --from-date 2026-03-01
+python scripts/populate_vote_sources.py --from-date 2026-03-01 --procedures-only
+python scripts/populate_vote_sources.py --from-date 2026-03-01 --summaries-only
+
+# 6. AI vote descriptions (Claude Haiku 4.5, ~$0.03/description)
+python scripts/populate_vote_descriptions.py --from-date 2026-03-01
+
+# 7. Topic categories
+python scripts/populate_topic_categories.py
+
+# 8. Poland relevance scoring (Claude Haiku 4.5, ~$0.01/vote)
+python scripts/populate_poland_relevance.py --from-date 2026-03-01
+
+# 9. Redeploy Vercel to refresh ISR cache (TTL 24h)
+git push origin main
 ```
 
-### Database Commands
+GitHub Actions runs this automatically on the 20th of each month (`.github/workflows/scrape.yml`).
 
-```bash
-# Create new migration
-alembic revision -m "description of changes"
+---
 
-# Run migrations
-alembic upgrade head
-
-# Rollback last migration
-alembic downgrade -1
-
-# Reset database (WARNING: deletes all data)
-docker-compose down -v
-docker-compose up -d db
-alembic upgrade head
-python scripts/seed_database.py --minimal
-```
-
-## Project Structure
+## Project structure
 
 ```
 europrojekt/
-├── frontend/              # Next.js 16 application
-│   ├── app/               # Next.js App Router pages ✅
-│   │   ├── page.tsx       # Homepage (MEPs list)
-│   │   ├── poslowie/[slug]/page.tsx  # MEP profile
-│   │   ├── glosowania/[id]/page.tsx  # Vote details
-│   │   ├── top-glosowania/page.tsx   # Top votes
-│   │   ├── metodologia/page.tsx      # Methodology
-│   │   └── o-projekcie/page.tsx      # About
-│   ├── components/        # React components ✅
-│   │   ├── Container.tsx
-│   │   ├── Header.tsx
-│   │   ├── Footer.tsx
-│   │   ├── MEPCard.tsx
-│   │   ├── VoteCard.tsx
-│   │   ├── StatsTable.tsx
-│   │   ├── VotingBreakdown.tsx
-│   │   ├── MEPVoteList.tsx
-│   │   └── CommitteeList.tsx
-│   ├── lib/
-│   │   ├── db/            # Drizzle ORM setup ✅
-│   │   │   ├── index.ts   # Database connection
-│   │   │   ├── schema.ts  # Drizzle schema
-│   │   │   └── queries.ts # Query functions
-│   │   ├── types.ts       # TypeScript types ✅
-│   │   └── utils.ts       # Utilities (cn) ✅
-│   ├── scripts/           # Frontend test scripts
-│   │   ├── test-db-connection.ts
-│   │   └── test-queries.ts
-│   ├── package.json       # Node.js dependencies
-│   └── .env.local         # Frontend environment variables
+├── frontend/
+│   ├── app/                        # Next.js App Router — 7 pages
+│   ├── components/
+│   │   ├── home/                   # Homepage-specific components
+│   │   ├── layout/                 # Header, Footer, Container
+│   │   ├── meps/                   # MEPCard, StatsTable, CommitteeList…
+│   │   ├── votes/                  # VoteCard, VoteDetail/, VoteSources…
+│   │   ├── sessions/               # LastSessionCard, UpcomingSessionCard
+│   │   └── ui/                     # shadcn/ui (do not edit manually)
+│   └── lib/
+│       ├── db/                     # schema.ts · queries.ts · index.ts
+│       └── types.ts
 ├── scripts/
-│   ├── alembic/           # Database migrations
-│   │   └── versions/      # Migration files
-│   ├── scrapers/          # Data collection scripts
-│   ├── processors/        # AI processing
-│   └── utils/             # Helper functions
-├── data/
-│   ├── cache/             # Cached scraping data
-│   └── raw/               # Raw scraped data
-├── tests/                 # Test files
-├── requirements.txt       # Python dependencies
-├── .env.example           # Environment variables template
-└── docker-compose.yml     # Database setup
+│   ├── scrapers/                   # MEPs, votes, sessions, committees…
+│   ├── alembic/versions/           # 15 migrations
+│   └── utils/                      # db_writer.py · logger.py
+├── docs/                           # Detailed documentation (see below)
+├── .github/workflows/scrape.yml    # Monthly automated scraping
+└── docker-compose.yml
 ```
 
-## Next Steps
-
-- [x] Set up Next.js 16 frontend infrastructure
-- [x] Install and configure Drizzle ORM
-- [x] Create database schema and query functions
-- [x] Build Next.js frontend pages (6 pages + 10 components)
-- [x] Implement TypeScript type system with BaseProps
-- [x] Add responsive design and Polish localization
-- [ ] Populate database with real MEP data
-- [ ] Implement Python scrapers (see `docs/SCRAPING_STRATEGY.md`)
-- [ ] Configure AI processing (see `docs/AI_PROMPTS.md`)
-- [ ] Deploy to Vercel + Supabase
+---
 
 ## Documentation
 
-All detailed documentation is in the `docs/` folder (local only, not committed to git):
+Detailed docs live in `docs/`:
 
-- **[PROJECT_OVERVIEW.md](docs/PROJECT_OVERVIEW.md)** - Project goals and scope
-- **[TECH_STACK.md](docs/TECH_STACK.md)** - Technology choices and versions
-- **[SETUP_GUIDE.md](docs/SETUP_GUIDE.md)** - Detailed setup instructions
-- **[DATABASE_SCHEMA.md](docs/DATABASE_SCHEMA.md)** - Database structure
-- **[DATA_FETCHING.md](docs/DATA_FETCHING.md)** - Drizzle ORM queries and examples
-- **[DATA_CONTRACTS.md](docs/DATA_CONTRACTS.md)** - TypeScript types and contracts
-- **[ARCHITECTURE.md](docs/ARCHITECTURE.md)** - System architecture
-- **[FRONTEND_MVP_STRUCTURE.md](docs/FRONTEND_MVP_STRUCTURE.md)** - Frontend pages structure
-- **[SCRAPING_STRATEGY.md](docs/SCRAPING_STRATEGY.md)** - Data collection strategy
-- **[AI_PROMPTS.md](docs/AI_PROMPTS.md)** - AI integration and prompts
+| File                           | Contents                                   |
+| ------------------------------ | ------------------------------------------ |
+| `ARCHITECTURE.md`              | System architecture overview               |
+| `DATABASE_SCHEMA.md`           | Full schema — 9 tables, all columns        |
+| `SCRAPING_STRATEGY.md`         | Scraper tiers and data sources             |
+| `DATA_FETCHING.md`             | Drizzle ORM query patterns                 |
+| `AI_PROMPTS.md`                | AI pipeline — prompts, scoring logic, tags |
+| `DEPLOYMENT.md`                | Vercel + Supabase production setup         |
+| `EP_API_ENDPOINTS_COMPLETE.md` | EP Open Data API v2 reference              |
 
-## Troubleshooting
-
-### Database Connection Failed
-
-```bash
-# Check if PostgreSQL is running
-docker ps | grep europosel-db
-
-# Check DATABASE_URL in .env.local
-cat .env.local | grep DATABASE_URL
-
-# Test connection manually
-psql postgresql://postgres:dev@localhost:5432/europoslowie
-```
-
-### Migration Errors
-
-```bash
-# Check current migration status
-alembic current
-
-# Show migration history
-alembic history
-
-# Reset migrations (if needed)
-alembic downgrade base
-alembic upgrade head
-```
+---
 
 ## License
 
-TBD
-
-## Contact
-
-TBD
+[GNU General Public License v3.0](LICENSE)

@@ -52,7 +52,7 @@ export const GlobalResultsPanel = ({
             <div className="w-2.5 h-2.5 rounded-full bg-primary shrink-0" />
             <div className="flex flex-col">
               <span className="text-xs font-black uppercase text-on-surface-variant tracking-wider">
-                Głosy Za
+                Za
               </span>
               <span className="text-2xl font-black font-display text-primary">
                 {forCount.toLocaleString('pl-PL')}
@@ -63,7 +63,7 @@ export const GlobalResultsPanel = ({
             <div className="w-2.5 h-2.5 rounded-full bg-error shrink-0" />
             <div className="flex flex-col">
               <span className="text-xs font-black uppercase text-on-surface-variant tracking-wider">
-                Głosy Przeciw
+                Przeciw
               </span>
               <span className="text-2xl font-black font-display text-primary">
                 {againstCount.toLocaleString('pl-PL')}

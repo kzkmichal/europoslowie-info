@@ -42,6 +42,7 @@ class PlenaryDocsScraper(BaseScraper):
         self,
         mep_ep_ids: List[int],
         years: Optional[List[int]] = None,
+        month: Optional[int] = None,
         known_ids: Set[str] = None,
     ) -> List[Dict[str, Any]]:
         """
@@ -50,6 +51,9 @@ class PlenaryDocsScraper(BaseScraper):
         Args:
             mep_ep_ids: List of EP numeric IDs for active Polish MEPs.
             years: Calendar years to scrape (default: all term years 2024-2026).
+            month: If provided alongside years, only keep documents from that month.
+                   EP API has no month param, so filtering is done client-side on
+                   document_date.
             known_ids: Document identifiers already in the DB — Phase 2 skips these.
 
         Returns:
@@ -61,7 +65,7 @@ class PlenaryDocsScraper(BaseScraper):
 
         self.log_info(
             f"Starting plenary docs scrape for {len(mep_set)} MEPs, "
-            f"years={target_years}, work-types={WORK_TYPES}"
+            f"years={target_years}" + (f", month={month:02d}" if month else "") + f", work-types={WORK_TYPES}"
             + (f", skipping {len(known)} known IDs" if known else "")
         )
         all_docs: List[Dict[str, Any]] = []
@@ -88,16 +92,31 @@ class PlenaryDocsScraper(BaseScraper):
                     docs = self._fetch_detail_for_all_meps(
                         identifier, mep_set, work_type
                     )
+                    if month:
+                        docs = [
+                            d for d in docs
+                            if self._matches_month(d.get('document_date'), month)
+                        ]
                     all_docs.extend(docs)
                     found += len(docs)
                     self.stats['items_scraped'] += len(docs)
 
                 self.log_info(
                     f"  Matched {found} MEP-document pairs for "
-                    f"{work_type} / {year}"
+                    f"{work_type} / {year}" + (f" month={month:02d}" if month else "")
                 )
 
         return all_docs
+
+    @staticmethod
+    def _matches_month(date_str: Optional[str], month: int) -> bool:
+        """Return True if date_str (YYYY-MM-DD) falls in the given month."""
+        if not date_str:
+            return True
+        try:
+            return int(str(date_str)[5:7]) == month
+        except (ValueError, IndexError):
+            return True
 
     def _collect_identifiers(self, work_type: str, year: int) -> List[str]:
         """

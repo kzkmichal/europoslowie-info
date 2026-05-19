@@ -290,6 +290,7 @@ def main():
                         mep_ep_ids=mep_ep_ids,
                         years=years,
                         known_ids=known_ids,
+                        month=args.month if args.month else None,
                     )
                     valid_questions = questions_scraper.validate(questions)
                     questions_scraper.print_summary()
@@ -323,6 +324,7 @@ def main():
                     speeches = speeches_scraper.scrape(
                         mep_ep_ids=mep_ep_ids_list,
                         year=args.year if args.year else None,
+                        month=args.month if args.month else None,
                         known_ids=known_speech_ids,
                     )
                     valid_speeches = speeches_scraper.validate(speeches)
@@ -355,6 +357,7 @@ def main():
                     docs = docs_scraper.scrape(
                         mep_ep_ids=mep_ep_ids_list,
                         years=[year] if args.year else None,
+                        month=args.month if args.month else None,
                         known_ids=known_doc_ids,
                     )
                     valid_docs = docs_scraper.validate(docs)

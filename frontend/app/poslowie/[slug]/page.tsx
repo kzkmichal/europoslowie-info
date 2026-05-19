@@ -68,7 +68,7 @@ export async function generateMetadata({
         ? [{ url: mep.photoUrl, width: 96, height: 96, alt: mep.fullName }]
         : undefined,
       locale: 'pl_PL',
-      siteName: 'Europosłowie.info',
+      siteName: 'Europosłowie.pl',
     },
     twitter: {
       card: mep.photoUrl ? 'summary_large_image' : 'summary',

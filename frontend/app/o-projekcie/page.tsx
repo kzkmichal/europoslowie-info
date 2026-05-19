@@ -4,10 +4,10 @@ import type { Metadata } from 'next'
 export const metadata: Metadata = {
   title: 'O projekcie',
   description:
-    'Europosłowie.info to platforma monitorująca aktywność 53 polskich europosłów w Parlamencie Europejskim. Transparentność, obiektywność i dane publiczne.',
+    'Europosłowie.pl to platforma monitorująca aktywność 53 polskich europosłów w Parlamencie Europejskim. Transparentność, obiektywność i dane publiczne.',
   keywords: [
     'o projekcie',
-    'Europosłowie.info',
+    'Europosłowie.pl',
     'monitoring PE',
     'transparentność polityczna',
     'parlament europejski',
@@ -28,7 +28,7 @@ export default function OProjekciePage() {
             <h2 className="text-2xl font-bold text-gray-900">Nasza misja</h2>
             <div className="mt-4 space-y-3 text-gray-700">
               <p>
-                <strong>Europosłowie.info</strong> to niezależna platforma
+                <strong>Europosłowie.pl</strong> to niezależna platforma
                 stworzona w celu zwiększenia transparentności działań polskich
                 europosłów w Parlamencie Europejskim.
               </p>
@@ -163,9 +163,9 @@ export default function OProjekciePage() {
               📂 Projekt Open Source
             </h3>
             <p className="mt-2 text-sm text-green-800">
-              Europosłowie.info to projekt open source. Kod źródłowy jest
-              dostępny publicznie, co pozwala każdemu zweryfikować poprawność
-              działania platformy i zaproponować ulepszenia.
+              Europosłowie.pl to projekt open source. Kod źródłowy jest dostępny
+              publicznie, co pozwala każdemu zweryfikować poprawność działania
+              platformy i zaproponować ulepszenia.
             </p>
           </section>
           <section className="mt-8">
@@ -204,7 +204,7 @@ export default function OProjekciePage() {
               ⚠️ Zastrzeżenie
             </h3>
             <p className="mt-2 text-xs text-gray-600">
-              Europosłowie.info to projekt niezależny, nieafiliowany z żadną
+              Europosłowie.pl to projekt niezależny, nieafiliowany z żadną
               partią polityczną ani instytucją rządową. Dane prezentowane na
               stronie pochodzą z oficjalnych źródeł publicznych i są
               przedstawiane w dobrej wierze. Nie ponosimy odpowiedzialności za

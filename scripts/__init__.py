@@ -1,1 +1,1 @@
-"""Scripts package for Europosłowie.info."""
+"""Scripts package for Europosłowie.pl."""

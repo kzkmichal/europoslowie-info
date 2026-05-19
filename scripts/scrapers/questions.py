@@ -34,6 +34,7 @@ class QuestionsScraper(BaseScraper):
         mep_ep_ids: Set[int],
         years: List[int],
         known_ids: Set[str] = None,
+        month: Optional[int] = None,
     ) -> List[Dict[str, Any]]:
         """
         Scrape written questions for the given years, filtered to Polish MEPs.
@@ -45,13 +46,16 @@ class QuestionsScraper(BaseScraper):
             mep_ep_ids: Set of EP numeric IDs for all active Polish MEPs.
             years: List of calendar years to scrape.
             known_ids: Question identifiers already in the DB — Phase 2 skips these.
+            month: Optional month filter (1-12). EP API has no month param so
+                   filtering is done client-side on date_submitted.
 
         Returns:
             List of question dicts ready for upsert.
         """
         known = known_ids or set()
+        period = f"years={years}" + (f", month={month:02d}" if month else "")
         self.log_info(
-            f"Starting questions scrape for years={years}, "
+            f"Starting questions scrape for {period}, "
             f"tracking {len(mep_ep_ids)} Polish MEPs"
             + (f", skipping {len(known)} known IDs" if known else "")
         )
@@ -68,13 +72,28 @@ class QuestionsScraper(BaseScraper):
             count = 0
             for qid in new_ids:
                 questions = self._fetch_question(qid, mep_ep_ids)
+                if month:
+                    questions = [
+                        q for q in questions
+                        if self._matches_month(q.get('date_submitted'), month)
+                    ]
                 all_questions.extend(questions)
                 count += len(questions)
                 self.stats['items_scraped'] += 1
 
-            self.log_info(f"  {count} question records kept for Polish MEPs in {year}")
+            self.log_info(f"  {count} question records kept for Polish MEPs in {year}" + (f" month={month:02d}" if month else ""))
 
         return all_questions
+
+    @staticmethod
+    def _matches_month(date_str: Optional[str], month: int) -> bool:
+        """Return True if date_str (YYYY-MM-DD) falls in the given month."""
+        if not date_str:
+            return True  # keep if date unknown
+        try:
+            return int(date_str[5:7]) == month
+        except (ValueError, IndexError):
+            return True
 
     def _collect_ids_for_year(self, year: int) -> List[str]:
         """Paginate through the list endpoint and return all question identifiers."""

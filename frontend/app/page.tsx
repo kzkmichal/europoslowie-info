@@ -1,4 +1,9 @@
-import { getAllMEPsWithStats, getLastSession, getNextSession, getSiteStats } from '@/lib/db/queries'
+import {
+  getAllMEPsWithStats,
+  getLastSession,
+  getNextSession,
+  getSiteStats,
+} from '@/lib/db/queries'
 import { Container } from '@/components/layout/Container'
 import { HeroSection } from '@/components/home/HeroSection'
 import { StatsCard } from '@/components/home/StatsCard'
@@ -7,7 +12,9 @@ import { LastSessionCard } from '@/components/sessions/LastSessionCard'
 import { UpcomingSessionCard } from '@/components/sessions/UpcomingSessionCard'
 
 export const generateMetadata = () => ({
-  title: { absolute: 'Europosłowie.info — Monitoring aktywności polskich europosłów' },
+  title: {
+    absolute: 'Europosłowie.pl — Monitoring aktywności polskich europosłów',
+  },
   description:
     'Przejrzysta platforma monitorująca aktywność, głosowania i obecność polskich posłów w Parlamencie Europejskim.',
   openGraph: { url: 'https://europoslowie.pl' },
