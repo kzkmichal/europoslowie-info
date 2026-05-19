@@ -18,7 +18,7 @@ class SpeechesScraper(BaseScraper):
     """
 
     def __init__(self):
-        super().__init__(base_url=EP_API_BASE, rate_limit_seconds=2.0)
+        super().__init__(base_url=EP_API_BASE, rate_limit_seconds=1.0)
 
     def scrape(
         self,
