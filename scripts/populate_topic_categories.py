@@ -57,36 +57,42 @@ logger = setup_logger(__name__)
 load_dotenv()
 
 
-def get_doc_refs_to_process(db_session: Session, limit: Optional[int] = None):
+def get_doc_refs_to_process(db_session: Session, limit: Optional[int] = None, from_date: Optional[str] = None):
     """
     Return distinct document_references for votes that have no topic_category yet.
     """
-    sql = text("""
+    date_filter = "AND date >= :from_date" if from_date else ""
+    params = {"from_date": from_date} if from_date else {}
+    sql = text(f"""
         SELECT DISTINCT document_reference
         FROM vote_items
         WHERE topic_category IS NULL
           AND document_reference IS NOT NULL
+          {date_filter}
         ORDER BY document_reference
     """ + (f" LIMIT {int(limit)}" if limit else ""))
-    rows = db_session.execute(sql).fetchall()
+    rows = db_session.execute(sql, params).fetchall()
     return [row.document_reference for row in rows]
 
 
-def get_oeil_votes_to_process(db_session: Session, limit: Optional[int] = None):
+def get_oeil_votes_to_process(db_session: Session, limit: Optional[int] = None, from_date: Optional[str] = None):
     """
     Return (vote_number, oeil_url) for main votes that have a PROCEDURE_OEIL
     source but still no topic_category.
     """
-    sql = text("""
+    date_filter = "AND vi.date >= :from_date" if from_date else ""
+    params = {"from_date": from_date} if from_date else {}
+    sql = text(f"""
         SELECT DISTINCT vs.vote_number, vs.url AS oeil_url
         FROM vote_sources vs
         JOIN vote_items vi ON vi.vote_number = vs.vote_number
         WHERE vs.source_type = 'PROCEDURE_OEIL'
           AND vi.topic_category IS NULL
           AND vi.is_main = true
+          {date_filter}
         ORDER BY vs.vote_number
     """ + (f" LIMIT {int(limit)}" if limit else ""))
-    rows = db_session.execute(sql).fetchall()
+    rows = db_session.execute(sql, params).fetchall()
     return [(row.vote_number, row.oeil_url) for row in rows]
 
 
@@ -123,10 +129,10 @@ def scrape_committee_from_oeil(scraper: SourcesScraper, procedure_ref: str) -> O
     return badge.get_text(strip=True)
 
 
-def run_pass1(engine, votes_scraper: VotesScraper, limit: Optional[int], dry_run: bool):
+def run_pass1(engine, votes_scraper: VotesScraper, limit: Optional[int], dry_run: bool, from_date: Optional[str] = None):
     """Pass 1: plenary-documents API → isAboutSubjectMatter."""
     with Session(engine) as db_session:
-        doc_refs = get_doc_refs_to_process(db_session, limit=limit)
+        doc_refs = get_doc_refs_to_process(db_session, limit=limit, from_date=from_date)
 
     logger.info(f"[Pass 1] Found {len(doc_refs)} doc_refs to process")
 
@@ -182,10 +188,10 @@ def run_pass1(engine, votes_scraper: VotesScraper, limit: Optional[int], dry_run
 
 
 def run_pass2(engine, votes_scraper: VotesScraper, sources_scraper: SourcesScraper,
-              limit: Optional[int], dry_run: bool):
+              limit: Optional[int], dry_run: bool, from_date: Optional[str] = None):
     """Pass 2: OEIL HTML fallback → responsible committee code → SUBJECT_MATTER_MAP."""
     with Session(engine) as db_session:
-        rows = get_oeil_votes_to_process(db_session, limit=limit)
+        rows = get_oeil_votes_to_process(db_session, limit=limit, from_date=from_date)
 
     logger.info(f"[Pass 2] Found {len(rows)} votes to process via OEIL HTML")
 
@@ -269,6 +275,13 @@ def main():
         action="store_true",
         help="Run only Pass 2 (OEIL HTML fallback)",
     )
+    parser.add_argument(
+        "--from-date",
+        type=str,
+        default=None,
+        metavar="YYYY-MM-DD",
+        help="Only process votes on or after this date (default: all votes)",
+    )
     args = parser.parse_args()
 
     if args.pass1_only and args.oeil_only:
@@ -286,15 +299,18 @@ def main():
     run_pass1_flag = not args.oeil_only
     run_pass2_flag = not args.pass1_only
 
+    if args.from_date:
+        logger.info(f"Filtering votes from date: {args.from_date}")
+
     total_updated = 0
 
     if run_pass1_flag:
-        updated, _ = run_pass1(engine, votes_scraper, args.limit, args.dry_run)
+        updated, _ = run_pass1(engine, votes_scraper, args.limit, args.dry_run, from_date=args.from_date)
         total_updated += updated
 
     if run_pass2_flag:
         with SourcesScraper() as sources_scraper:
-            updated, _ = run_pass2(engine, votes_scraper, sources_scraper, args.limit, args.dry_run)
+            updated, _ = run_pass2(engine, votes_scraper, sources_scraper, args.limit, args.dry_run, from_date=args.from_date)
             total_updated += updated
 
     logger.info(f"All passes complete. Total rows updated: {total_updated}")
