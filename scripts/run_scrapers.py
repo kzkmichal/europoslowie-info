@@ -217,6 +217,8 @@ def main():
                 logger.info("")
             else:
                 total_votes_inserted = 0
+                scraped_meeting_ids = DatabaseWriter.get_scraped_meeting_ids()
+                logger.info(f"Already scraped meetings: {len(scraped_meeting_ids)}")
 
                 with VotesScraper() as votes_scraper:
                     # Scrape votes for each session (iterate session_meeting_days to
@@ -228,6 +230,9 @@ def main():
                         all_votes: list = []
 
                         for meeting_id in meeting_days:
+                            if meeting_id in scraped_meeting_ids:
+                                logger.info(f"  Skipping {meeting_id} — already scraped")
+                                continue
                             logger.info(f"  Fetching voting results for {meeting_id}...")
                             day_votes = votes_scraper.scrape(meeting_id=meeting_id)
                             if day_votes:

@@ -510,6 +510,17 @@ class DatabaseWriter:
         return {row.question_number for row in rows}
 
     @staticmethod
+    def get_scraped_meeting_ids() -> set:
+        """Return session_numbers that already have vote_items in the DB."""
+        with get_db_session() as session:
+            rows = session.execute(text("""
+                SELECT DISTINCT vs.session_number
+                FROM voting_sessions vs
+                INNER JOIN vote_items vi ON vi.session_id = vs.id
+            """)).fetchall()
+        return {row.session_number for row in rows}
+
+    @staticmethod
     def backfill_monthly_stats_counts() -> None:
         """
         Update questions_count and speeches_count in monthly_stats based on
