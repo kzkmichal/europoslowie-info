@@ -16,7 +16,7 @@ jobs:
   collect:
     name: Collect — sessions, votes, representative votes
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 180
     outputs:
       year: ${{ steps.date.outputs.year }}
       month: ${{ steps.date.outputs.month }}
