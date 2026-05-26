@@ -71,7 +71,7 @@ export async function getAllMEPsWithStats(): Promise<MEPWithStats[]> {
           EXTRACT(YEAR FROM vs.end_date)::int AS yr,
           EXTRACT(MONTH FROM vs.end_date)::int AS mo
         FROM voting_sessions vs
-        INNER JOIN vote_items vi ON vi.session_id = vs.id
+        INNER JOIN vote_items vi ON vi.session_id = vs.id AND vi.is_representative = true
         WHERE vs.end_date <= CURRENT_DATE
         GROUP BY 1, 2
         HAVING COUNT(vi.id) > 0
