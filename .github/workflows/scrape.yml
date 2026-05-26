@@ -2,7 +2,7 @@ name: Monthly Data Update
 
 on:
   schedule:
-    - cron: '0 3 20 * *'  # 20. każdego miesiąca, 3:00 UTC
+    - cron: '0 3 5 * *'  # 5. każdego miesiąca, 3:00 UTC — scrape poprzedniego miesiąca (kompletne sesje)
   workflow_dispatch:
     inputs:
       year:
@@ -38,8 +38,13 @@ jobs:
         run: |
           YEAR="${{ github.event.inputs.year }}"
           MONTH="${{ github.event.inputs.month }}"
-          [ -z "$YEAR" ]  && YEAR=$(date +%Y)
-          [ -z "$MONTH" ] && MONTH=$(date +%-m)
+          if [ -z "$YEAR" ] && [ -z "$MONTH" ]; then
+            YEAR=$(date -d "1 month ago" +%Y)
+            MONTH=$(date -d "1 month ago" +%-m)
+          else
+            [ -z "$YEAR" ]  && YEAR=$(date +%Y)
+            [ -z "$MONTH" ] && MONTH=$(date +%-m)
+          fi
           FROM_DATE="${YEAR}-$(printf '%02d' $MONTH)-01"
           echo "year=$YEAR"           >> $GITHUB_OUTPUT
           echo "month=$MONTH"         >> $GITHUB_OUTPUT
@@ -126,3 +131,8 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+
+      - name: Calculate monthly statistics
+        run: python -m scripts.processors.calculate_stats
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
