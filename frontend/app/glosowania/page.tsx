@@ -15,6 +15,7 @@ export type PageProps = {
     result: string
     search: string
     topic: string
+    polandRelevance: string
   }>
 }
 
@@ -39,8 +40,15 @@ export default async function GlosowaniaPage({ searchParams }: PageProps) {
       ? params?.result
       : undefined
 
+  const polandRelevance =
+    params?.polandRelevance === 'key' ||
+    params?.polandRelevance === 'important' ||
+    params?.polandRelevance === 'neutral'
+      ? params.polandRelevance
+      : undefined
+
   const [{ votes, hasMore }, topics] = await Promise.all([
-    getVotesList({ limit: 20, page, year, month, result, search, topic }),
+    getVotesList({ limit: 20, page, year, month, result, search, topic, polandRelevance }),
     getTopicCategories(),
   ])
 
@@ -62,6 +70,7 @@ export default async function GlosowaniaPage({ searchParams }: PageProps) {
       result: result || undefined,
       search: search || undefined,
       topic: topic || undefined,
+      polandRelevance: polandRelevance || undefined,
       ...overrides,
     }
     const urlParams = new URLSearchParams(
@@ -95,12 +104,13 @@ export default async function GlosowaniaPage({ searchParams }: PageProps) {
           search={search}
           topic={topic}
           topics={topics}
+          polandRelevance={polandRelevance}
         />
         {votes.length === 0 ? (
           <p className="text-outline">Brak głosowań do wyświetlenia.</p>
         ) : (
           <div className="flex flex-col">
-            <div className="grid gap-4 lg:grid-cols-2">
+            <div className="grid gap-4">
               {Object.entries(votesByDate).map(([date, dateVotes]) => (
                 <Fragment key={date}>
                   <h2 className="font-display col-span-full text-xl font-semibold text-on-surface">

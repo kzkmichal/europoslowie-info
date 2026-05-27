@@ -20,6 +20,7 @@ type VotesFilterProps = {
   result?: 'ADOPTED' | 'REJECTED'
   topic?: string
   topics?: string[]
+  polandRelevance?: 'key' | 'important' | 'neutral'
 }
 
 const filterTriggerClass =
@@ -38,6 +39,7 @@ export const VotesFilter = ({
   search,
   topic,
   topics = [],
+  polandRelevance,
 }: VotesFilterProps) => {
   const router = useRouter()
   const pathname = usePathname()
@@ -61,7 +63,7 @@ export const VotesFilter = ({
     { value: 12, label: 'Grudzień' },
   ]
 
-  const hasActiveFilters = !!(year || month || result || debouncedSearch || topic)
+  const hasActiveFilters = !!(year || month || result || debouncedSearch || topic || polandRelevance)
 
   useEffect(() => {
     if ((debouncedSearch || undefined) !== search) {
@@ -160,6 +162,22 @@ export const VotesFilter = ({
             </SelectContent>
           </Select>
         )}
+
+        <Select
+          value={polandRelevance ?? '__all__'}
+          onValueChange={(value) => updateFilters('polandRelevance', value)}
+        >
+          <SelectTrigger className={filterTriggerClass}>
+            {filterLabel('Waga')}
+            <SelectValue placeholder="Każda" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="__all__">Każda waga</SelectItem>
+            <SelectItem value="key">🔴 Kluczowe</SelectItem>
+            <SelectItem value="important">🟡 Istotne</SelectItem>
+            <SelectItem value="neutral">⚪ Neutralne</SelectItem>
+          </SelectContent>
+        </Select>
 
         <div className="ml-auto flex items-center gap-2">
           {hasActiveFilters && (

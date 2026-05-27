@@ -467,9 +467,10 @@ async function _getVotesList(
     result?: 'ADOPTED' | 'REJECTED'
     search?: string
     topic?: string
+    polandRelevance?: 'key' | 'important' | 'neutral'
   } = {},
 ): Promise<VotesList> {
-  const { page = 1, limit = 20, year, month, result, search, topic } = options
+  const { page = 1, limit = 20, year, month, result, search, topic, polandRelevance } = options
   const offset = (page - 1) * limit
 
   const conditions = [eq(voteItems.isRepresentative, true)]
@@ -495,6 +496,14 @@ async function _getVotesList(
 
   if (topic) {
     conditions.push(eq(voteItems.topicCategory, topic))
+  }
+
+  if (polandRelevance === 'key') {
+    conditions.push(sql`${voteItems.polandScore} >= 70`)
+  } else if (polandRelevance === 'important') {
+    conditions.push(sql`${voteItems.polandScore} >= 40 AND ${voteItems.polandScore} < 70`)
+  } else if (polandRelevance === 'neutral') {
+    conditions.push(sql`${voteItems.polandScore} < 40`)
   }
 
   const whereClause = and(...conditions)
