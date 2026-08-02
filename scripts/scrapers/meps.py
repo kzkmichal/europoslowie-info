@@ -3,6 +3,7 @@ import re
 from typing import List, Dict, Any, Optional
 from datetime import datetime
 from .base import BaseScraper
+from scripts.utils.storage import SupabaseStorage
 
 
 class MEPsScraper(BaseScraper):
@@ -20,6 +21,7 @@ class MEPsScraper(BaseScraper):
             base_url=self.API_BASE_URL,
             rate_limit_seconds=2.0
         )
+        self.storage = SupabaseStorage()
 
     def scrape(self, term: int = 10) -> List[Dict[str, Any]]:
         """
@@ -226,10 +228,11 @@ class MEPsScraper(BaseScraper):
                 email = email.replace('mailto:', '')
                 mep['email'] = email
 
-            # Extract photo URL
+            # Extract photo URL and upload to Supabase Storage if configured
             photo_url = detail.get('img', '')
             if photo_url:
-                mep['photo_url'] = photo_url
+                stored_url = self.storage.get_or_upload(ep_id, photo_url)
+                mep['photo_url'] = stored_url or photo_url
 
             # Extract current memberships (hasMembership array)
             memberships = detail.get('hasMembership', [])

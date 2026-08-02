@@ -21,6 +21,8 @@ jobs:
       year: ${{ steps.date.outputs.year }}
       month: ${{ steps.date.outputs.month }}
       from_date: ${{ steps.date.outputs.from_date }}
+      next_year: ${{ steps.date.outputs.next_year }}
+      next_month: ${{ steps.date.outputs.next_month }}
 
     steps:
       - uses: actions/checkout@v4
@@ -46,10 +48,19 @@ jobs:
             [ -z "$MONTH" ] && MONTH=$(date +%-m)
           fi
           FROM_DATE="${YEAR}-$(printf '%02d' $MONTH)-01"
-          echo "year=$YEAR"           >> $GITHUB_OUTPUT
-          echo "month=$MONTH"         >> $GITHUB_OUTPUT
-          echo "from_date=$FROM_DATE" >> $GITHUB_OUTPUT
-          echo "Resolved: year=$YEAR month=$MONTH from_date=$FROM_DATE"
+          if [ "$MONTH" -eq 12 ]; then
+            NEXT_YEAR=$((YEAR + 1))
+            NEXT_MONTH=1
+          else
+            NEXT_YEAR=$YEAR
+            NEXT_MONTH=$((MONTH + 1))
+          fi
+          echo "year=$YEAR"             >> $GITHUB_OUTPUT
+          echo "month=$MONTH"           >> $GITHUB_OUTPUT
+          echo "from_date=$FROM_DATE"   >> $GITHUB_OUTPUT
+          echo "next_year=$NEXT_YEAR"   >> $GITHUB_OUTPUT
+          echo "next_month=$NEXT_MONTH" >> $GITHUB_OUTPUT
+          echo "Resolved: year=$YEAR month=$MONTH from_date=$FROM_DATE next=$NEXT_YEAR/$NEXT_MONTH"
 
       - name: Run scrapers (sessions + votes only)
         run: |
@@ -66,6 +77,20 @@ jobs:
 
       - name: Populate representative votes
         run: python scripts/populate_representative_votes.py
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+      - name: Prefetch next month sessions (for upcoming session card)
+        run: |
+          python scripts/run_scrapers.py \
+            --year ${{ steps.date.outputs.next_year }} \
+            --month ${{ steps.date.outputs.next_month }} \
+            --skip-meps \
+            --skip-committees \
+            --skip-votes \
+            --skip-questions \
+            --skip-speeches \
+            --skip-documents
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
 

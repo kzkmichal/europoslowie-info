@@ -51,7 +51,7 @@ class DatabaseWriter:
                             national_party = EXCLUDED.national_party,
                             ep_group = EXCLUDED.ep_group,
                             email = EXCLUDED.email,
-                            photo_url = EXCLUDED.photo_url,
+                            photo_url = COALESCE(EXCLUDED.photo_url, meps.photo_url),
                             website_url = EXCLUDED.website_url,
                             term_end = EXCLUDED.term_end,
                             is_active = EXCLUDED.is_active,
