@@ -51,8 +51,14 @@ def main():
 
     for ep_id, full_name, photo_url in rows:
         if not args.force and storage.exists(ep_id):
-            logger.info(f"  SKIP {full_name} — already in storage")
-            skipped += 1
+            stored_url = storage._public_url(ep_id)
+            with get_db_session() as session:
+                session.execute(
+                    text("UPDATE meps SET photo_url = :url WHERE ep_id = :ep_id"),
+                    {'url': stored_url, 'ep_id': ep_id}
+                )
+            logger.info(f"  UPDATE {full_name} → {stored_url}")
+            updated += 1
             continue
 
         if args.dry_run:
